@@ -1,2 +1,0 @@
-# Aplicaciones_DI
-Aplicaciones
