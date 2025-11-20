@@ -1,0 +1,2735 @@
+<!DOCTYPE html>
+<html lang="es" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Pinto Guía Turística</title>
+    
+    <!-- Tailwind CSS (Utility First) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome (Icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Map Library (Leaflet) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Google Fonts: San Francisco like -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --ios-blue: #007AFF;
+            --ios-gray: #8E8E93;
+            --ios-bg-light: #F2F2F7;
+            --ios-bg-dark: #000000;
+            --ios-card-light: #FFFFFF;
+            --ios-card-dark: #1C1CE;
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease;
+        }
+
+        /* iOS Scrollbar hidden */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .dark .glass {
+            background: rgba(28, 28, 30, 0.8);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* iOS Animations */
+        .page-transition {
+            animation: slideIn 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tap-active:active {
+            transform: scale(0.96);
+            opacity: 0.8;
+            transition: transform 0.1s;
+        }
+
+        /* Checkbox iOS Toggle Style */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #34D399;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #34D399;
+        }
+        
+        /* Hide Map attribution for cleaner UI (optional) */
+        .leaflet-control-attribution { display: none; }
+    </style>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        ios: {
+                            blue: '#007AFF',
+                            red: '#FF3B30',
+                            green: '#34C759',
+                            yellow: '#FFCC00',
+                            gray: '#8E8E93',
+                            light: '#F2F2F7',
+                            dark: '#000000',
+                            card: '#1C1C1E'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-ios-light dark:bg-ios-dark text-black dark:text-white h-screen w-full overflow-hidden flex flex-col selection:bg-ios-blue selection:text-white">
+
+    <!-- TOP NAVIGATION (Dynamic) -->
+    <header id="main-header" class="glass fixed top-0 w-full z-50 pt-[env(safe-area-inset-top)] transition-all duration-300">
+        <div class="flex justify-between items-center px-4 h-14">
+            <button id="back-btn" onclick="App.goBack()" class="text-ios-blue hidden text-lg flex items-center gap-1 tap-active">
+                <i class="fa-solid fa-chevron-left"></i> <span data-i18n="back">Atrás</span>
+            </button>
+            <h1 id="page-title" class="text-lg font-semibold absolute left-1/2 transform -translate-x-1/2 whitespace-nowrap">Pinto Guide</h1>
+            <div class="w-8"></div> <!-- Spacer -->
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <!-- El overflow se gestiona ahora por JS -->
+    <main id="app-container" class="flex-1 pt-20 pb-24 px-4 relative scroll-smooth">
+        <!-- Views will be injected here by JS -->
+    </main>
+
+    <!-- BOTTOM TAB BAR -->
+    <nav class="glass fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom)] border-t border-gray-200 dark:border-gray-800">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="App.navigate('home')" class="tab-btn active flex flex-col items-center gap-1 w-full tap-active text-ios-blue" data-target="home">
+                <i class="fa-solid fa-compass text-xl"></i>
+                <span class="text-[10px] font-medium" data-i18n="nav_explore">Explorar</span>
+            </button>
+            <button onclick="App.navigate('pinto')" class="tab-btn flex flex-col items-center gap-1 w-full tap-active text-gray-400" data-target="pinto">
+                <i class="fa-solid fa-tower-observation text-xl"></i>
+                <span class="text-[10px] font-medium" data-i18n="sections.pinto">Pinto</span>
+            </button>
+            <button onclick="App.navigate('itineraries')" class="tab-btn flex flex-col items-center gap-1 w-full tap-active text-gray-400" data-target="itineraries">
+                <i class="fa-solid fa-route text-xl"></i>
+                <span class="text-[10px] font-medium" data-i18n="nav_trips">Rutas</span>
+            </button>
+            <button onclick="App.navigate('search')" class="tab-btn flex flex-col items-center gap-1 w-full tap-active text-gray-400" data-target="search">
+                <i class="fa-solid fa-magnifying-glass text-xl"></i>
+                <span class="text-[10px] font-medium" data-i18n="nav_search">Reservar</span>
+            </button>
+            <button onclick="App.navigate('profile')" class="tab-btn flex flex-col items-center gap-1 w-full tap-active text-gray-400" data-target="profile">
+                <i class="fa-solid fa-user text-xl"></i>
+                <span class="text-[10px] font-medium" data-i18n="nav_profile">Perfil</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MODAL SYSTEM -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-[60] hidden backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div id="modal-content" class="bg-white dark:bg-ios-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 transform translate-y-full sm:translate-y-10 transition-transform duration-300 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <!-- Modal dynamic content -->
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed top-14 left-1/2 transform -translate-x-1/2 bg-white/90 dark:bg-gray-800/90 backdrop-blur shadow-lg rounded-full px-6 py-3 z-[70] flex items-center gap-3 transition-all duration-300 -translate-y-24 opacity-0">
+        <i id="toast-icon" class="fa-solid fa-check-circle text-green-500"></i>
+        <span id="toast-message" class="text-sm font-medium">Notification</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /**
+         * DATA & TRANSLATIONS
+         */
+        const DB = {
+            languages: {
+                es: "Español", en: "English", it: "Italiano", de: "Deutsch", fr: "Français"
+            },
+            routeContent: {
+                fam: {
+                    steps: [
+                        { time: "10:00", title: "Parque Juan Carlos I", icon: "fa-tree" },
+                        { time: "12:00", title: "Arqueopinto", icon: "fa-bone" },
+                        { time: "14:00", title: "Picnic en el parque", icon: "fa-utensils" },
+                        { time: "17:00", title: "Heladería Plaza", icon: "fa-ice-cream" }
+                    ]
+                },
+                back: {
+                    steps: [
+                        { time: "09:00", title: "Estación Cercanías", icon: "fa-train" },
+                        { time: "10:00", title: "Ruta a pie Centro Histórico", icon: "fa-person-walking" },
+                        { time: "13:00", title: "Tapas Baratas", icon: "fa-beer-mug-empty" },
+                        { time: "16:00", title: "Torre de Éboli", icon: "fa-tower-observation" }
+                    ]
+                },
+                lux: {
+                    steps: [
+                        { time: "11:00", title: "Spa Hotel Princesa", icon: "fa-spa" },
+                        { time: "14:00", title: "Restaurante Michelin", icon: "fa-wine-glass" },
+                        { time: "17:00", title: "Compras Boutique", icon: "fa-bag-shopping" },
+                        { time: "20:00", title: "Teatro Francisco Rabal", icon: "fa-masks-theater" }
+                    ]
+                },
+                adv: {
+                    steps: [
+                        { time: "08:00", title: "Ruta Bici Pinto-Madrid", icon: "fa-bicycle" },
+                        { time: "12:00", title: "Escalada Indoor", icon: "fa-mountain" },
+                        { time: "16:00", title: "Karting Pinto", icon: "fa-car-side" }
+                    ]
+                },
+                // Simulación de ruta personalizada
+                custom: {
+                    steps: [
+                        { time: "10:00", title: "Inicio Aventura Custom", icon: "fa-star" },
+                        { time: "11:00", title: "Lugar Secreto (Aleatorio)", icon: "fa-map-pin" },
+                        { time: "12:00", title: "Descanso y Fotos", icon: "fa-camera" }
+                    ]
+                }
+            },
+            // --- INICIO NUEVOS DATOS ---
+            spainLocations: [
+                { id: 1, name: "Sagrada Familia", city: "Barcelona", type: "tourist", lat: 41.4036, lng: 2.1744 },
+                { id: 2, name: "Plaza Mayor", city: "Madrid", type: "tourist", lat: 40.4154, lng: -3.7074 },
+                { id: 3, name: "Barrio de Triana", city: "Sevilla", type: "local", lat: 37.3835, lng: -6.0010 },
+                { id: 4, name: "Playa de Gulpiyuri", city: "Asturias", type: "hidden", lat: 43.4475, lng: -4.8870 },
+                { id: 5, name: "Alhambra", city: "Granada", type: "tourist", lat: 37.1761, lng: -3.5881 },
+                { id: 6, name: "Mercado de la Boquería", city: "Barcelona", type: "local", lat: 41.3817, lng: 2.1717 },
+                { id: 7, name: "Setenil de las Bodegas", city: "Cádiz", type: "hidden", lat: 36.8647, lng: -5.1800 },
+            ],
+            cinemas: [
+                { id: 1, name: "Cines Plaza Éboli", location: "Pinto", price: 7.50 },
+                { id: 2, name: "Yelmo Cines (Parquesur)", location: "Leganés", price: 8.90 },
+                { id: 3, name: "Cinesa (Nassica)", location: "Getafe", price: 8.20 },
+            ],
+            hotels: [
+                { id: 1, name: "Hotel Princesa de Éboli", location: "Pinto", rating: "★★★★", price: "45€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/46509918.jpg?k=c4325e3703939e52b6840e50d0123570d33b2a8a00e236326536514874027d3a&o=&hp=1" },
+                { id: 2, name: "Eurostars Arenas de Pinto", location: "Pinto", rating: "★★★★", price: "55€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/45688638.jpg?k=df05d6954401d92385f63600272c1378592d7d6e2157861e3f57907502803892&o=&hp=1" },
+                { id: 3, name: "Hotel Riu Plaza España", location: "Madrid", rating: "★★★★", price: "150€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/216966640.jpg?k=03e35532b60b240B216966640&o=&hp=1" },
+                { id: 4, name: "Pestana CR7 Gran Vía", location: "Madrid", rating: "★★★★", price: "180€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/267860213.jpg?k=267860213&o=&hp=1" },
+                { id: 5, name: "W Barcelona", location: "Barcelona", rating: "★★★★★", price: "350€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/197800898.jpg?k=197800898&o=&hp=1" },
+                { id: 6, name: "Hotel Alfonso XIII", location: "Sevilla", rating: "★★★★★", price: "400€", img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/283921068.jpg?k=283921068&o=&hp=1" },
+            ],
+            health: [
+                // Hospitales
+                { id: 1, name: "Hospital Universitario Infanta Cristina", location: "Parla (Madrid)", type: "hospital", services: "Urgencias, Cirugía, Maternidad" },
+                { id: 2, name: "Hospital Universitario de Getafe", location: "Getafe (Madrid)", type: "hospital", services: "Urgencias, Traumatología, Quemados" },
+                { id: 3, name: "Hospital La Paz", location: "Madrid Capital", type: "hospital", services: "Todas las especialidades, Infantil" },
+                { id: 4, name: "Hospital Quirónsalud Sur", location: "Alcorcón (Madrid)", type: "hospital", services: "Privado, Urgencias, Especialidades" },
+                // Centros de Salud
+                { id: 5, name: "Centro de Salud Pinto", location: "Pinto", type: "centro", services: "Atención Primaria, Pediatría" },
+                { id: 6, name: "Centro de Salud Parque Europa", location: "Pinto", type: "centro", services: "Atención Primaria, Enfermería" },
+                { id: 7, name: "C.S. San Cristóbal", location: "Getafe (Madrid)", type: "centro", services: "Atención Primaria, Extracciones" },
+                { id: 8, name: "C.S. Las Cortes", location: "Madrid Capital", type: "centro", services: "Atención Primaria, Urgencias PAC" }
+            ],
+            pharmacies: [
+                // Pinto
+                { id: 1, name: "Farmacia Plaza de la Constitución", location: "Pinto", hours: "09:00 - 21:30 (L-S)", type: "pinto" },
+                { id: 2, name: "Farmacia Trébol Pinto", location: "Pinto (CC Plaza Éboli)", hours: "09:00 - 22:00 (L-D)", type: "pinto" },
+                { id: 3, name: "Farmacia Ortopedia MªA. Díaz", location: "Pinto", hours: "09:30 - 21:30 (L-S)", type: "pinto" },
+                // Otras Regiones
+                { id: 4, name: "Farmacia Atocha (24h)", location: "Madrid", hours: "24 Horas", type: "spain" },
+                { id: 5, name: "Farmacia La Rosaleda", location: "Santiago (Galicia)", hours: "09:00 - 22:00 (L-S)", type: "spain" },
+                { id: 6, name: "Farmacia Plaza Mayor", location: "Salamanca (C. y León)", hours: "09:00 - 22:00 (L-S)", type: "spain" },
+                { id: 7, name: "Farmacia S. Jaume", location: "Barcelona", hours: "09:00 - 21:30 (L-S)", type: "spain" },
+                { id: 8, name: "Farmacia Central", location: "Valencia", hours: "24 Horas", type: "spain" },
+                { id: 9, name: "Farmacia Fuensanta", location: "Murcia", hours: "09:00 - 22:00 (L-S)", type: "spain" },
+                { id: 10, name: "Farmacia Conquistadores", location: "Badajoz", hours: "09:00 - 22:00 (L-S)", type: "spain" },
+                { id: 11, name: "Farmacia Central", location: "Cádiz", hours: "09:00 - 21:30 (L-S)", type: "spain" }
+            ],
+            banks: [
+                { name: "CaixaBank", type: "Nacional" },
+                { name: "Banco Santander", type: "Nacional" },
+                { name: "BBVA", type: "Nacional" },
+                { name: "ING", type: "Online/Nacional" }
+            ],
+            restaurants: [
+                // Lujo
+                { id: 1, name: "DiverXO", location: "Madrid", type: "lujo", price: "€€€€",
+                  reviews: [
+                    { user: "Carlos", text: "Una experiencia de otro mundo." },
+                    { user: "Ana", text: "Creativo, pero muy caro." }
+                  ],
+                  popularDishes: [
+                    { name: "Lienzo en blanco", price: "365€" },
+                    { name: "Maridaje", price: "150€" }
+                  ]
+                },
+                { id: 2, name: "Arzak", location: "San Sebastián (País Vasco)", type: "lujo", price: "€€€€",
+                  reviews: [ { user: "Mikel", text: "Tradición y vanguardia." } ],
+                  popularDishes: [ { name: "Menú Degustación", price: "280€" } ]
+                },
+                { id: 3, name: "El Celler de Can Roca", location: "Girona (Cataluña)", type: "lujo", price: "€€€€",
+                  reviews: [ { user: "Laia", text: "El mejor restaurante del mundo." } ],
+                  popularDishes: [ { name: "Menú Festival", price: "270€" } ]
+                },
+                { id: 14, name: "La Casona del Judío", location: "Santander (Cantabria)", type: "lujo", price: "€€€€",
+                  reviews: [ { user: "Maria", text: "Un estrella Michelin sorprendente." } ],
+                  popularDishes: [ { name: "Menú Esencia", price: "110€" } ]
+                },
+                { id: 15, name: "Casa Marcial", location: "Arriondas (Asturias)", type: "lujo", price: "€€€€",
+                  reviews: [ { user: "David", text: "La fabada en otro nivel." } ],
+                  popularDishes: [ { name: "Fabada de Prendes", price: "28€" } ]
+                },
+                // Local Pinto
+                { id: 4, name: "Panpintao", location: "Pinto", type: "local", price: "€€€",
+                  reviews: [ { user: "Vecino", text: "Calidad increíble en Pinto." } ],
+                  popularDishes: [ { name: "Arroces", price: "25€" } ]
+                },
+                { id: 5, name: "Mesón El Bodegón", location: "Pinto", type: "local", price: "€€",
+                  reviews: [ { user: "Cliente Fiel", text: "Raciones generosas y trato familiar." } ],
+                  popularDishes: [ { name: "Cocido Madrileño", price: "18€" } ]
+                },
+                { id: 7, name: "La Ermita", location: "Pinto", type: "local", price: "€€",
+                  reviews: [ { user: "Sara", text: "El mejor rabo de toro." } ],
+                  popularDishes: [ { name: "Rabo de toro", price: "19€" } ]
+                },
+                { id: 13, name: "Pizzería La Strada", location: "Pinto", type: "local", price: "€€",
+                  reviews: [ { user: "Familia", text: "Pizzas de masa fina buenísimas." } ],
+                  popularDishes: [ { name: "Pizza de la Casa", price: "14€" } ]
+                },
+                // Local España
+                { id: 8, name: "Casa Lucio", location: "Madrid", type: "local", price: "€€€",
+                  reviews: [ { user: "Javier", text: "Los mejores huevos rotos." } ],
+                  popularDishes: [ { name: "Huevos Rotos", price: "14€" } ]
+                },
+                { id: 9, name: "Sobrino de Botín", location: "Madrid", type: "local", price: "€€€",
+                  reviews: [ { user: "Emily", text: "El restaurante más antiguo." } ],
+                  popularDishes: [ { name: "Cochinillo Asado", price: "28€" } ]
+                },
+                { id: 10, name: "Casa Solla", location: "Pontevedra (Galicia)", type: "local", price: "€€€",
+                  reviews: [ { user: "Alba", text: "Producto gallego espectacular." } ],
+                  popularDishes: [ { name: "Menú Tradición", price: "90€" } ]
+                },
+                { id: 11, name: "Ca' Sento", location: "Valencia", type: "local", price: "€€€",
+                  reviews: [ { user: "Pascual", text: "La mejor paella." } ],
+                  popularDishes: [ { name: "Paella Valenciana", price: "22€" } ]
+                },
+                { id: 12, name: "El Rinconcillo", location: "Sevilla (Andalucía)", type: "local", price: "€€",
+                  reviews: [ { user: "Antonio", text: "Tapas con historia, desde 1670." } ],
+                  popularDishes: [ { name: "Espinacas con Garbanzos", price: "4.50€" } ]
+                },
+                { id: 16, name: "Restaurante Lillas Pastia", location: "Huesca (Aragón)", type: "local", price: "€€€",
+                  reviews: [ { user: "Lucia", text: "Amor por la trufa." } ],
+                  popularDishes: [ { name: "Menú Trufa", price: "85€" } ]
+                }
+            ],
+            gyms: [
+                { id: 1, name: "Basic-Fit Pinto", location: "Pinto", price: "24.99€", hours: "07:00 - 22:30" },
+                { id: 2, name: "VivaGym", location: "Madrid", price: "29.99€", hours: "06:00 - 23:00" },
+                { id: 3, name: "McFit", location: "Getafe", price: "29.90€", hours: "24h" }
+            ],
+            // --- FIN NUEVOS DATOS ---
+            i18n: {
+                es: {
+                    nav_explore: "Explorar", nav_trips: "Rutas", nav_search: "Reservar", nav_profile: "Perfil", back: "Atrás",
+                    welcome: "Descubre Pinto",
+                    discover: "Descubre", featured: "Destacados",
+                    sections: { 
+                        pinto: "Pinto", spain: "España", health: "Salud", mobility: "Movilidad", cinema: "Cine", map: "Mapa",
+                        geo_center: "Centro Geográfico",
+                        pinto_desc: "Pinto es conocido por albergar el punto céntrico de la Península Ibérica. Es una ciudad llena de historia, zonas verdes y cultura.",
+                        events: "Eventos y Fiestas", // NUEVA
+                        guide_mob: "Guía de Movilidad", hotels_pinto: "Hoteles en Pinto",
+                        banks: "Bancos", gastronomy: "Gastronomía", sports: "Deportes" // NUEVAS
+                    },
+                    auth_login: "Iniciar Sesión", auth_logout: "Cerrar Sesión", guest: "Invitado",
+                    auth_placeholder: "Tu nombre", auth_subtitle: "Inicia sesión para guardar tus rutas y favoritos en la nube.",
+                    auth_welcome: "Hola, viajero", auth_expert: "Viajero Experto",
+                    auth_password: "Contraseña", // NUEVO
+                    msg_login_req: "Inicia sesión para guardar favoritos.",
+                    book_tab_all: "Todo", book_tab_hotel: "Hoteles", book_tab_trans: "Transporte",
+                    book_search_ph: "Buscar hoteles...",
+                    pay_modal_title: "Confirmar Reserva", pay_method: "Método de Pago", pay_btn: "Reservar",
+                    pay_card: "Tarjeta de Crédito", pay_bizum: "Bizum", pay_cash: "Efectivo",
+                    itinerary_title: "Elige tu estilo", itinerary_my: "Mis Rutas", itinerary_create: "Crear Nuevo",
+                    itinerary_empty: "No tienes rutas guardadas", itinerary_generating: "Generando ruta...",
+                    itinerary_family: "Familia", itinerary_backpack: "Mochilero", itinerary_luxury: "Lujo", itinerary_adventure: "Aventura",
+                    route_steps: "Pasos de la ruta",
+                    weather: "Clima", currency: "Moneda", emergency: "Emergencia", visa: "Visado",
+                    spain_title: "España", spain_subtitle: "Arte, historia y gastronomía",
+                    cine_title: "Cine",
+                    // --- INICIO NUEVOS DATOS ---
+                    mob_fares_title: "Tarifas Abono Transporte (Madrid)",
+                    mob_fare_young: "Abono Joven (< 26 años)",
+                    mob_fare_normal: "Abono Normal (Zonas A-E2)",
+                    mob_fare_senior: "Abono Tercera Edad (> 65 años)",
+                    mob_zones_title: "Zonas del Abono",
+                    mob_zones_desc: "El abono funciona por coronas concéntricas. Pinto se encuentra en la zona B2.",
+                    mob_map_title: "Mapas de Transporte",
+                    mob_map_renfe: "Mapa de Cercanías (Renfe)",
+                    mob_map_metro: "Mapa de Metro",
+                    mob_schedule_title: "Consultar Horarios",
+                    mob_schedule_train: "Horarios Cercanías (C-3)",
+                    mob_schedule_bus: "Horarios Bus Circular (Pinto)",
+                    mob_placeholder_desc: "Tu imagen del mapa aquí",
+                    schedule_train_title: "Salidas desde Pinto (C-3)",
+                    schedule_train_dir_1: "Dirección: Sol / Chamartín",
+                    schedule_bus_title: "Bus Circular (Línea 1)",
+                    schedule_bus_dir_1: "Sentido: Tenería / Estación",
+                    schedule_every_20: "Cada 20 min (aprox)",
+                    hotel_pinto: "Pinto",
+                    hotel_madrid: "Madrid",
+                    hotel_spain_all: "Toda España",
+                    health_title: "Salud y Farmacias",
+                    health_card_info_title: "Tarjeta Sanitaria",
+                    health_card_info_eu: "Tarjeta Sanitaria Europea (TSE)",
+                    health_card_info_eu_desc: "Si eres ciudadano de la UE, esta tarjeta te da derecho a recibir atención médica pública en España en las mismas condiciones que un ciudadano español.",
+                    health_card_info_other: "Otros Países",
+                    health_card_info_other_desc: "Si vienes de fuera de la UE, es muy recomendable contratar un seguro de viaje privado con cobertura médica completa.",
+                    health_hospitals: "Hospitales",
+                    health_centers: "Centros de Salud",
+                    health_pharmacies: "Farmacias",
+                    health_pharmacies_pinto: "Farmacias en Pinto",
+                    health_pharmacies_spain: "Farmacias Destacadas (España)",
+                    health_services: "Servicios:",
+                    bank_title: "Bancos y Servicios",
+                    gastro_title_lujo: "Restaurantes de Lujo",
+                    gastro_title_local: "Joyas Locales",
+                    gastro_reviews: "Reseñas de Usuarios",
+                    gastro_popular: "Platos Populares",
+                    gastro_location: "Ubicación",
+                    price_cheap: "Económico",
+                    price_normal: "Normal",
+                    price_expensive: "Caro",
+                    sports_title: "Gimnasios",
+                    price_month: "por mes",
+                    hours_title: "Horario",
+                    // --- FIN NUEVOS DATOS ---
+                    prof_favs: "Favoritos", prof_routes: "Mis Rutas", prof_lang: "Idioma", prof_dark: "Modo Oscuro",
+                    favs_empty: "No has guardado ningún favorito aún.", routes_user_empty: "No has creado ninguna ruta.",
+                    create_route_title: "Ruta Personalizada",
+                    // Map Filters
+                    map_all: "Todo", map_history: "Cultura", map_nature: "Naturaleza", map_food: "Comer", map_hotel: "Dormir", map_leisure: "Ocio", map_shop: "Compras",
+                    // Eventos
+                    events_upcoming: "Próximos Eventos",
+                    events_desc_fiestas: "Música, atracciones y procesión.",
+                    events_desc_carnaval: "Desfiles y concurso de disfraces.",
+                    // Nueva sección Reservar
+                    book_title: "Elige tu reserva",
+                    book_hotel_es: "Hotel (Pinto/España)",
+                    book_taxi: "Taxi",
+                    book_uber: "Uber",
+                    book_bike: "Bici",
+                    book_car: "Coche de Alquiler",
+                    pay_example_title: "Ejemplo: Reserva Taxi",
+                    pay_example_price: "15€",
+                    // --- NUEVAS TRADUCCIONES ---
+                    // Generador de Rutas (Boceto)
+                    route_generator_title: "Crea tu ruta personalizada",
+                    route_q_name: "¿Qué nombre le pones a tu ruta?",
+                    route_name_ph: "Ej: Fin de semana en Pinto",
+                    route_q_style: "¿Cómo te gustaría que fuera tu ruta?",
+                    style_relax: "Tranquila",
+                    style_challenge: "Buscar nuevos retos",
+                    style_action: "Con emoción y acción",
+                    style_photos: "Para sacar buenas fotos",
+                    style_romantic: "Romántica",
+                    style_inspiration: "Busco inspiración",
+                    style_family: "Para ir con la familia",
+                    style_extreme: "Intensa (deportistas)",
+                    route_q_where: "¿Dónde te gustaría hacer tu ruta?",
+                    where_random: "Aleatorio",
+                    where_pinto: "Pinto",
+                    route_q_pets: "¿Llevas mascotas?",
+                    pets_yes: "Sí",
+                    pets_no: "No",
+                    route_q_time: "¿A qué hora del día quiere empezar?",
+                    time_morning: "¡Genial! Un buen madrugón para aprovechar el día.",
+                    time_midday: "Perfecto para una ruta con parada para comer.",
+                    time_afternoon: "¡Ideal para disfrutar de la tarde y el atardecer!",
+                    time_night: "Una aventura nocturna. ¡Interesante!",
+                    generate_btn: "Generar y Guardar Ruta",
+                    // Guardar Ruta
+                    save_route_btn: "Añadir a Mis Rutas",
+                    route_saved_success: "Ruta guardada:",
+                    route_deleted_success: "Ruta eliminada",
+                    back_modal: "Volver",
+                    view_btn: "Ver",
+                    delete_btn: "Borrar",
+                    // España
+                    spain_map_title: "Mapa Interactivo de España",
+                    spain_map_tourist: "Turístico",
+                    spain_map_local: "Local",
+                    spain_map_hidden: "Oculto",
+                    // Cine
+                    cinema_pinto_title: "Cines en Pinto y Cercanías",
+                    cinema_box_office: "Taquilla de España",
+                    buy_tickets: "Comprar Entradas"
+                },
+                en: {
+                    nav_explore: "Explore", nav_trips: "Routes", nav_search: "Book", nav_profile: "Profile", back: "Back",
+                    welcome: "Discover Pinto",
+                    discover: "Discover", featured: "Featured",
+                    sections: { 
+                        pinto: "Pinto", spain: "Spain", health: "Health", mobility: "Mobility", cinema: "Cinema", map: "Map",
+                        geo_center: "Geographic Center",
+                        pinto_desc: "Pinto is known for hosting the central point of the Iberian Peninsula. It is a city full of history, green areas, and culture.",
+                        events: "Events & Festivals", // NEW
+                        guide_mob: "Mobility Guide", hotels_pinto: "Hotels in Pinto",
+                        banks: "Banks", gastronomy: "Gastronomy", sports: "Sports" // NEW
+                    },
+                    auth_login: "Log In", auth_logout: "Log Out", guest: "Guest",
+                    auth_placeholder: "Your name", auth_subtitle: "Log in to save your routes and favorites to the cloud.",
+                    auth_welcome: "Hello, traveler", auth_expert: "Expert Traveler",
+                    auth_password: "Password", // NEW
+                    msg_login_req: "Log in to save favorites.",
+                    book_tab_all: "All", book_tab_hotel: "Hotels", book_tab_trans: "Transport",
+                    book_search_ph: "Search hotels...",
+                    pay_modal_title: "Confirm Booking", pay_method: "Payment Method", pay_btn: "Book",
+                    pay_card: "Credit Card", pay_bizum: "Bizum", pay_cash: "Cash",
+                    itinerary_title: "Choose your style", itinerary_my: "My Routes", itinerary_create: "Create New",
+                    itinerary_empty: "No saved routes", itinerary_generating: "Generating route...",
+                    itinerary_family: "Family", itinerary_backpack: "Backpacker", itinerary_luxury: "Luxury", itinerary_adventure: "Adventure",
+                    route_steps: "Route steps",
+                    weather: "Weather", currency: "Currency", emergency: "Emergency", visa: "Visa",
+                    spain_title: "Spain", spain_subtitle: "Art, history and gastronomy",
+                    cine_title: "Cinema",
+                    // --- INICIO NUEVOS DATOS ---
+                    mob_fares_title: "Transport Pass Fares (Madrid)",
+                    mob_fare_young: "Youth Pass (< 26 years)",
+                    mob_fare_normal: "Normal Pass (Zones A-E2)",
+                    mob_fare_senior: "Senior Pass (> 65 years)",
+                    mob_zones_title: "Pass Zones",
+                    mob_zones_desc: "The pass works by concentric rings. Pinto is in zone B2.",
+                    mob_map_title: "Transport Maps",
+                    mob_map_renfe: "Cercanías Map (Renfe)",
+                    mob_map_metro: "Metro Map",
+                    mob_schedule_title: "Check Schedules",
+                    mob_schedule_train: "Cercanías Schedules (C-3)",
+                    mob_schedule_bus: "Circular Bus Schedules (Pinto)",
+                    mob_placeholder_desc: "Your map image here",
+                    schedule_train_title: "Departures from Pinto (C-3)",
+                    schedule_train_dir_1: "Direction: Sol / Chamartín",
+                    schedule_bus_title: "Circular Bus (Line 1)",
+                    schedule_bus_dir_1: "Direction: Tenería / Station",
+                    schedule_every_20: "Every 20 min (approx)",
+                    hotel_pinto: "Pinto",
+                    hotel_madrid: "Madrid",
+                    hotel_spain_all: "All Spain",
+                    health_title: "Medical Centers & Hospitals",
+                    health_card_info_title: "Health Card",
+                    health_card_info_eu: "European Health Insurance Card (EHIC)",
+                    health_card_info_eu_desc: "If you are an EU citizen, this card entitles you to public healthcare in Spain under the same conditions as a Spanish citizen.",
+                    health_card_info_other: "Other Countries",
+                    health_card_info_other_desc: "If you are from outside the EU, it is highly recommended to have private travel insurance with full medical coverage.",
+                    health_hospitals: "Hospitals",
+                    health_centers: "Health Centers",
+                    health_pharmacies: "Pharmacies",
+                    health_pharmacies_pinto: "Pharmacies in Pinto",
+                    health_pharmacies_spain: "Key Pharmacies (Spain)",
+                    health_services: "Services:",
+                    bank_title: "Banks & Services",
+                    gastro_title_lujo: "Luxury Restaurants",
+                    gastro_title_local: "Local Gems",
+                    gastro_reviews: "User Reviews",
+                    gastro_popular: "Popular Dishes",
+                    gastro_location: "Location",
+                    price_cheap: "Affordable",
+                    price_normal: "Normal",
+                    price_expensive: "Expensive",
+                    sports_title: "Gyms",
+                    price_month: "per month",
+                    hours_title: "Hours",
+                    // --- FIN NUEVOS DATOS ---
+                    prof_favs: "Favorites", prof_routes: "My Routes", prof_lang: "Language", prof_dark: "Dark Mode",
+                    favs_empty: "No favorites saved yet.", routes_user_empty: "You haven't created any routes.",
+                    create_route_title: "Custom Route",
+                    map_all: "All", map_history: "Culture", map_nature: "Nature", map_food: "Food", map_hotel: "Sleep", map_leisure: "Leisure", map_shop: "Shop",
+                    // Events
+                    events_upcoming: "Upcoming Events",
+                    events_desc_fiestas: "Music, rides and procession.",
+                    events_desc_carnaval: "Parades and costume contest.",
+                    // New Booking Section
+                    book_title: "Choose your booking",
+                    book_hotel_es: "Hotel (Pinto/Spain)",
+                    book_taxi: "Taxi",
+                    book_uber: "Uber",
+                    book_bike: "Bike",
+                    book_car: "Rental Car",
+                    pay_example_title: "Example: Taxi Booking",
+                    pay_example_price: "15€",
+                    // --- NEW TRANSLATIONS ---
+                    // Route Generator (Sketch)
+                    route_generator_title: "Create your custom route",
+                    route_q_name: "What do you want to name your route?",
+                    route_name_ph: "E.g.: Weekend in Pinto",
+                    route_q_style: "What would you like your route to be like?",
+                    style_relax: "Calm",
+                    style_challenge: "Find new challenges",
+                    style_action: "With excitement and action",
+                    style_photos: "To take good photos",
+                    style_romantic: "Romantic",
+                    style_inspiration: "Looking for inspiration",
+                    style_family: "With the family",
+                    style_extreme: "Intense (athletes)",
+                    route_q_where: "Where would you like to do your route?",
+                    where_random: "Random",
+                    where_pinto: "Pinto",
+                    route_q_pets: "Are you bringing pets?",
+                    pets_yes: "Yes",
+                    pets_no: "No",
+                    route_q_time: "What time do you want to start?",
+                    time_morning: "Great! An early start to seize the day.",
+                    time_midday: "Perfect for a route with a lunch stop.",
+                    time_afternoon: "Ideal to enjoy the afternoon and sunset!",
+                    time_night: "A nocturnal adventure. Interesting!",
+                    generate_btn: "Generate & Save Route",
+                    // Save Route
+                    save_route_btn: "Add to My Routes",
+                    route_saved_success: "Route saved:",
+                    route_deleted_success: "Route deleted",
+                    back_modal: "Back",
+                    view_btn: "View",
+                    delete_btn: "Delete",
+                    // España
+                    spain_map_title: "Interactive Map of Spain",
+                    spain_map_tourist: "Tourist",
+                    spain_map_local: "Local",
+                    spain_map_hidden: "Hidden",
+                    // Cine
+                    cinema_pinto_title: "Cinemas in Pinto & Nearby",
+                    cinema_box_office: "Spain Box Office",
+                    buy_tickets: "Buy Tickets"
+                },
+                // --- FRANCÉS ---
+                fr: {
+                    nav_explore: "Explorer", nav_trips: "Itinéraires", nav_search: "Réserver", nav_profile: "Profil", back: "Retour",
+                    welcome: "Découvrez Pinto",
+                    discover: "Découvrir", featured: "En vedette",
+                    sections: { 
+                        pinto: "Pinto", spain: "Espagne", health: "Santé", mobility: "Mobilité", cinema: "Cinéma", map: "Carte",
+                        geo_center: "Centre Géographique",
+                        pinto_desc: "Pinto est connue pour abriter le point central de la péninsule ibérique. C'est une ville pleine d'histoire et de culture.",
+                        events: "Événements et Fêtes", // NEW
+                        guide_mob: "Guide de mobilité", hotels_pinto: "Hôtels à Pinto",
+                        banks: "Banques", gastronomy: "Gastronomie", sports: "Sports" // NEW
+                    },
+                    auth_login: "Connexion", auth_logout: "Déconnexion", guest: "Invité",
+                    auth_placeholder: "Votre nom", auth_subtitle: "Connectez-vous pour enregistrer vos itinéraires et favoris.",
+                    auth_welcome: "Bonjour, voyageur", auth_expert: "Voyageur Expert",
+                    auth_password: "Mot de passe", // NEW
+                    msg_login_req: "Connectez-vous pour enregistrer.",
+                    book_tab_all: "Tout", book_tab_hotel: "Hôtels", book_tab_trans: "Transport",
+                    book_search_ph: "Rechercher des hôtels...",
+                    pay_modal_title: "Confirmer la réservation", pay_method: "Méthode de paiement", pay_btn: "Réserver",
+                    pay_card: "Carte de crédit", pay_bizum: "Bizum", pay_cash: "Espèces",
+                    itinerary_title: "Choisissez votre style", itinerary_my: "Mes Itinéraires", itinerary_create: "Créer",
+                    itinerary_empty: "Aucun itinéraire", itinerary_generating: "Génération de l'itinéraire...",
+                    itinerary_family: "Famille", itinerary_backpack: "Routard", itinerary_luxury: "Luxe", itinerary_adventure: "Aventure",
+                    route_steps: "Étapes",
+                    weather: "Météo", currency: "Devise", emergency: "Urgence", visa: "Visa",
+                    spain_title: "Espagne", spain_subtitle: "Art, histoire et gastronomie",
+                    cine_title: "Cinéma",
+                    // --- INICIO NUEVOS DATOS ---
+                    mob_fares_title: "Tarifs Pass Transport (Madrid)",
+                    mob_fare_young: "Pass Jeune (< 26 ans)",
+                    mob_fare_normal: "Pass Normal (Zones A-E2)",
+                    mob_fare_senior: "Pass Senior (> 65 ans)",
+                    mob_zones_title: "Zones du Pass",
+                    mob_zones_desc: "Le pass fonctionne par anneaux concentriques. Pinto est en zone B2.",
+                    mob_map_title: "Cartes des Transports",
+                    mob_map_renfe: "Carte Cercanías (Renfe)",
+                    mob_map_metro: "Carte du Métro",
+                    mob_schedule_title: "Consulter les Horaires",
+                    mob_schedule_train: "Horaires Cercanías (C-3)",
+                    mob_schedule_bus: "Horaires Bus Circulaire (Pinto)",
+                    mob_placeholder_desc: "Votre image de carte ici",
+                    schedule_train_title: "Départs de Pinto (C-3)",
+                    schedule_train_dir_1: "Direction: Sol / Chamartín",
+                    schedule_bus_title: "Bus Circulaire (Ligne 1)",
+                    schedule_bus_dir_1: "Direction: Tenería / Gare",
+                    schedule_every_20: "Toutes les 20 min (environ)",
+                    hotel_pinto: "Pinto",
+                    hotel_madrid: "Madrid",
+                    hotel_spain_all: "Toute l'Espagne",
+                    health_title: "Santé et Pharmacies",
+                    health_card_info_title: "Carte de Santé",
+                    health_card_info_eu: "Carte Européenne d'Assurance Maladie (CEAM)",
+                    health_card_info_eu_desc: "Si vous êtes citoyen de l'UE, cette carte vous donne droit aux soins de santé publics en Espagne.",
+                    health_card_info_other: "Autres Pays",
+                    health_card_info_other_desc: "Si vous venez de l'extérieur de l'UE, il est fortement recommandé de souscrire une assurance voyage privée.",
+                    health_hospitals: "Hôpitaux",
+                    health_centers: "Centres de Santé",
+                    health_pharmacies: "Pharmacies",
+                    health_pharmacies_pinto: "Pharmacies à Pinto",
+                    health_pharmacies_spain: "Pharmacies Clés (Espagne)",
+                    health_services: "Services:",
+                    bank_title: "Banques et Services",
+                    gastro_title_lujo: "Restaurants de Luxe",
+                    gastro_title_local: "Pépites Locales",
+                    gastro_reviews: "Avis des Utilisateurs",
+                    gastro_popular: "Plats Populaires",
+                    gastro_location: "Emplacement",
+                    price_cheap: "Abordable",
+                    price_normal: "Normal",
+                    price_expensive: "Cher",
+                    sports_title: "Salles de Sport",
+                    price_month: "par mois",
+                    hours_title: "Horaires",
+                    // --- FIN NUEVOS DATOS ---
+                    prof_favs: "Favoris", prof_routes: "Mes Itinéraires", prof_lang: "Langue", prof_dark: "Mode Sombre",
+                    favs_empty: "Aucun favori.", routes_user_empty: "Aucun itinéraire créé.",
+                    create_route_title: "Itinéraire Personnalisé",
+                    map_all: "Tout", map_history: "Culture", map_nature: "Nature", map_food: "Manger", map_hotel: "Dormir", map_leisure: "Loisir", map_shop: "Achats",
+                    // Events
+                    events_upcoming: "Événements à venir",
+                    events_desc_fiestas: "Musique, attractions et procession.",
+                    events_desc_carnaval: "Défilés et concours de costumes.",
+                    // New Booking Section
+                    book_title: "Choisissez votre réservation",
+                    book_hotel_es: "Hôtel (Pinto/Espagne)",
+                    book_taxi: "Taxi",
+                    book_uber: "Uber",
+                    book_bike: "Vélo",
+                    book_car: "Voiture de Location",
+                    pay_example_title: "Exemple: Réservation Taxi",
+                    pay_example_price: "15€",
+                    // --- NEW TRANSLATIONS ---
+                    route_generator_title: "Créez votre itinéraire",
+                    route_q_name: "Nom de votre itinéraire?",
+                    route_name_ph: "Ex: Week-end à Pinto",
+                    route_q_style: "Comment aimeriez-vous votre itinéraire?",
+                    style_relax: "Tranquille",
+                    style_challenge: "Nouveaux défis",
+                    style_action: "Avec action",
+                    style_photos: "Pour de belles photos",
+                    style_romantic: "Romantique",
+                    style_inspiration: "Inspiration",
+                    style_family: "En famille",
+                    style_extreme: "Intense (sportifs)",
+                    route_q_where: "Où?",
+                    where_random: "Aléatoire",
+                    where_pinto: "Pinto",
+                    route_q_pets: "Avez-vous des animaux?",
+                    pets_yes: "Oui",
+                    pets_no: "Non",
+                    route_q_time: "À quelle heure?",
+                    time_morning: "Super! Tôt pour profiter.",
+                    time_midday: "Parfait pour une pause déjeuner.",
+                    time_afternoon: "Idéal pour l'après-midi!",
+                    time_night: "Une aventure nocturne.",
+                    generate_btn: "Générer et Enregistrer",
+                    // Save Route
+                    save_route_btn: "Ajouter à Mes Itinéraires",
+                    route_saved_success: "Itinéraire enregistré:",
+                    route_deleted_success: "Itinéraire supprimé",
+                    back_modal: "Retour",
+                    view_btn: "Voir",
+                    delete_btn: "Effacer",
+                    // España
+                    spain_map_title: "Carte Interactive de l'Espagne",
+                    spain_map_tourist: "Touristique",
+                    spain_map_local: "Local",
+                    spain_map_hidden: "Caché",
+                    // Cine
+                    cinema_pinto_title: "Cinémas à Pinto et à proximité",
+                    cinema_box_office: "Box-office Espagne",
+                    buy_tickets: "Acheter des Billets"
+                },
+                // --- ITALIANO ---
+                it: {
+                    nav_explore: "Esplora", nav_trips: "Itinerari", nav_search: "Prenota", nav_profile: "Profilo", back: "Indietro",
+                    welcome: "Scopri Pinto",
+                    discover: "Scopri", featured: "In evidenza",
+                    sections: { 
+                        pinto: "Pinto", spain: "Spagna", health: "Salute", mobility: "Mobilità", cinema: "Cinema", map: "Mappa",
+                        geo_center: "Centro Geografico",
+                        pinto_desc: "Pinto è nota per ospitare il punto centrale della penisola iberica. È una città ricca di storia e cultura.",
+                        events: "Eventi e Festival", // NEW
+                        guide_mob: "Guida alla Mobilità", hotels_pinto: "Hotel a Pinto",
+                        banks: "Banche", gastronomy: "Gastronomia", sports: "Sport" // NEW
+                    },
+                    auth_login: "Accedi", auth_logout: "Esci", guest: "Ospite",
+                    auth_placeholder: "Il tuo nome", auth_subtitle: "Accedi per salvare i tuoi percorsi e preferiti.",
+                    auth_welcome: "Ciao, viaggiatore", auth_expert: "Viaggiatore Esperto",
+                    auth_password: "Password", // NEW
+                    msg_login_req: "Accedi per salvare.",
+                    book_tab_all: "Tutto", book_tab_hotel: "Hotel", book_tab_trans: "Trasporto",
+                    book_search_ph: "Cerca hotel...",
+                    pay_modal_title: "Conferma Prenotazione", pay_method: "Metodo di Pagamento", pay_btn: "Prenota",
+                    pay_card: "Carta di Credito", pay_bizum: "Bizum", pay_cash: "Contanti",
+                    itinerary_title: "Scegli il tuo stile", itinerary_my: "I Miei Itinerari", itinerary_create: "Crea Nuovo",
+                    itinerary_empty: "Nessun itinerario salvato", itinerary_generating: "Generazione itinerario...",
+                    itinerary_family: "Famiglia", itinerary_backpack: "Sacco a pelo", itinerary_luxury: "Lusso", itinerary_adventure: "Avventura",
+                    route_steps: "Tappe",
+                    weather: "Meteo", currency: "Valuta", emergency: "Emergenza", visa: "Visto",
+                    spain_title: "Spagna", spain_subtitle: "Arte, storia e gastronomia",
+                    cine_title: "Cinema",
+                    // --- INICIO NUEVOS DATOS ---
+                    mob_fares_title: "Tariffe Abbonamento Trasporti (Madrid)",
+                    mob_fare_young: "Abbonamento Giovani (< 26 anni)",
+                    mob_fare_normal: "Abbonamento Normale (Zone A-E2)",
+                    mob_fare_senior: "Abbonamento Senior (> 65 anni)",
+                    mob_zones_title: "Zone Abbonamento",
+                    mob_zones_desc: "L'abbonamento funziona per anelli concentrici. Pinto si trova in zona B2.",
+                    mob_map_title: "Mappe dei Trasporti",
+                    mob_map_renfe: "Mappa Cercanías (Renfe)",
+                    mob_map_metro: "Mappa della Metropolitana",
+                    mob_schedule_title: "Controlla Orari",
+                    mob_schedule_train: "Orari Cercanías (C-3)",
+                    mob_schedule_bus: "Orari Autobus Circolare (Pinto)",
+                    mob_placeholder_desc: "La tua immagine della mappa qui",
+                    schedule_train_title: "Partenze da Pinto (C-3)",
+                    schedule_train_dir_1: "Direzione: Sol / Chamartín",
+                    schedule_bus_title: "Autobus Circolare (Linea 1)",
+                    schedule_bus_dir_1: "Direzione: Tenería / Stazione",
+                    schedule_every_20: "Ogni 20 min (circa)",
+                    hotel_pinto: "Pinto",
+                    hotel_madrid: "Madrid",
+                    hotel_spain_all: "Tutta la Spagna",
+                    health_title: "Salute e Farmacie",
+                    health_card_info_title: "Tessera Sanitaria",
+                    health_card_info_eu: "Tessera Europea di Assicurazione Malattia (TEAM)",
+                    health_card_info_eu_desc: "Se sei cittadino UE, questa tessera ti dà diritto all'assistenza sanitaria pubblica in Spagna.",
+                    health_card_info_other: "Altri Paesi",
+                    health_card_info_other_desc: "Se vieni da fuori UE, si consiglia vivamente un'assicurazione di viaggio privata.",
+                    health_hospitals: "Ospedali",
+                    health_centers: "Centri Sanitari",
+                    health_pharmacies: "Farmacie",
+                    health_pharmacies_pinto: "Farmacie a Pinto",
+                    health_pharmacies_spain: "Farmacie Principali (Spagna)",
+                    health_services: "Servizi:",
+                    bank_title: "Banche e Servizi",
+                    gastro_title_lujo: "Ristoranti di Lusso",
+                    gastro_title_local: "Perle Locali",
+                    gastro_reviews: "Recensioni Utenti",
+                    gastro_popular: "Piatti Popolari",
+                    gastro_location: "Posizione",
+                    price_cheap: "Economico",
+                    price_normal: "Normale",
+                    price_expensive: "Costoso",
+                    sports_title: "Palestre",
+                    price_month: "al mese",
+                    hours_title: "Orario",
+                    // --- FIN NUEVOS DATOS ---
+                    create_route_title: "Itinerario Personalizzato",
+                    map_all: "Tutto", map_history: "Cultura", map_nature: "Natura", map_food: "Cibo", map_hotel: "Dormire", map_leisure: "Svago", map_shop: "Shopping",
+                    // Events
+                    events_upcoming: "Eventi futuri",
+                    events_desc_fiestas: "Musica, giostre e processione.",
+                    events_desc_carnaval: "Sfilate e concorso di costumi.",
+                    // New Booking Section
+                    book_title: "Scegli la tua prenotazione",
+                    book_hotel_es: "Hotel (Pinto/Spagna)",
+                    book_taxi: "Taxi",
+                    book_uber: "Uber",
+                    book_bike: "Bici",
+                    book_car: "Auto a Noleggio",
+                    pay_example_title: "Esempio: Prenotazione Taxi",
+                    pay_example_price: "15€",
+                    // --- NEW TRANSLATIONS ---
+                    route_generator_title: "Crea il tuo percorso",
+                    route_q_name: "Nome del percorso?",
+                    route_name_ph: "Es: Weekend a Pinto",
+                    route_q_style: "Come vorresti il tuo percorso?",
+                    style_relax: "Tranquillo",
+                    style_challenge: "Nuove sfide",
+                    style_action: "Con emozione",
+                    style_photos: "Per belle foto",
+                    style_romantic: "Romantico",
+                    style_inspiration: "Ispirazione",
+                    style_family: "In famiglia",
+                    style_extreme: "Intenso (atleti)",
+                    route_q_where: "Dove?",
+                    where_random: "Casuale",
+                    where_pinto: "Pinto",
+                    route_q_pets: "Porti animali?",
+                    pets_yes: "Sì",
+                    pets_no: "No",
+                    route_q_time: "A che ora?",
+                    time_morning: "Ottimo! Presto per godersi la giornata.",
+                    time_midday: "Perfetto per una pausa pranzo.",
+                    time_afternoon: "Ideale per il pomeriggio!",
+                    time_night: "Un'avventura notturna.",
+                    generate_btn: "Genera e Salva",
+                    // Save Route
+                    save_route_btn: "Aggiungi ai Miei Itinerari",
+                    route_saved_success: "Itinerario salvato:",
+                    route_deleted_success: "Itinerario eliminato",
+                    back_modal: "Indietro",
+                    view_btn: "Vedi",
+                    delete_btn: "Elimina",
+                    // España
+                    spain_map_title: "Mappa Interattiva della Spagna",
+                    spain_map_tourist: "Turistico",
+                    spain_map_local: "Locale",
+                    spain_map_hidden: "Nascosto",
+                    // Cine
+                    cinema_pinto_title: "Cinema a Pinto e dintorni",
+                    cinema_box_office: "Box Office Spagna",
+                    buy_tickets: "Compra Biglietti"
+                },
+                // --- ALEMÁN ---
+                de: {
+                    nav_explore: "Entdecken", nav_trips: "Routen", nav_search: "Buchen", nav_profile: "Profil", back: "Zurück",
+                    welcome: "Entdecke Pinto",
+                    discover: "Entdecken", featured: "Vorgestellt",
+                    sections: { 
+                        pinto: "Pinto", spain: "Spanien", health: "Gesundheit", mobility: "Mobilität", cinema: "Kino", map: "Karte",
+                        geo_center: "Geographisches Zentrum",
+                        pinto_desc: "Pinto ist bekannt als der zentrale Punkt der Iberischen Halbinsel. Eine Stadt voller Geschichte und Kultur.",
+                        events: "Veranstaltungen", // NEW
+                        guide_mob: "Mobilitätsführer", hotels_pinto: "Hotels in Pinto",
+                        banks: "Banken", gastronomy: "Gastronomie", sports: "Sport" // NEW
+                    },
+                    auth_login: "Anmelden", auth_logout: "Abmelden", guest: "Gast",
+                    auth_placeholder: "Dein Name", auth_subtitle: "Melde dich an, um deine Routen und Favoriten zu speichern.",
+                    auth_welcome: "Hallo, Reisender", auth_expert: "Experte",
+                    auth_password: "Passwort", // NEW
+                    msg_login_req: "Bitte anmelden.",
+                    book_tab_all: "Alle", book_tab_hotel: "Hotels", book_tab_trans: "Transport",
+                    book_search_ph: "Hotels suchen...",
+                    pay_modal_title: "Buchung bestätigen", pay_method: "Zahlungsmethode", pay_btn: "Buchen",
+                    pay_card: "Kreditkarte", pay_bizum: "Bizum", pay_cash: "Bargeld",
+                    itinerary_title: "Wähle deinen Stil", itinerary_my: "Meine Routen", itinerary_create: "Neu erstellen",
+                    itinerary_empty: "Keine Routen", itinerary_generating: "Route wird erstellt...",
+                    itinerary_family: "Familie", itinerary_backpack: "Rucksack", itinerary_luxury: "Luxus", itinerary_adventure: "Abenteuer",
+                    route_steps: "Schritte",
+                    weather: "Wetter", currency: "Währung", emergency: "Notfall", visa: "Visum",
+                    spain_title: "Spanien", spain_subtitle: "Kunst, Geschichte und Gastronomie",
+                    cine_title: "Kino",
+                    // --- INICIO NUEVOS DATOS ---
+                    mob_fares_title: "Transportpass-Tarife (Madrid)",
+                    mob_fare_young: "Jugendpass (< 26 Jahre)",
+                    mob_fare_normal: "Normaler Pass (Zonen A-E2)",
+                    mob_fare_senior: "Seniorenpass (> 65 Jahre)",
+                    mob_zones_title: "Pass-Zonen",
+                    mob_zones_desc: "Der Pass funktioniert in konzentrischen Ringen. Pinto liegt in Zone B2.",
+                    mob_map_title: "Transportkarten",
+                    mob_map_renfe: "Cercanías-Karte (Renfe)",
+                    mob_map_metro: "U-Bahn-Karte",
+                    mob_schedule_title: "Fahrpläne Prüfen",
+                    mob_schedule_train: "Fahrpläne Cercanías (C-3)",
+                    mob_schedule_bus: "Fahrpläne Rundbus (Pinto)",
+                    mob_placeholder_desc: "Ihr Kartenbild hier",
+                    schedule_train_title: "Abfahrten von Pinto (C-3)",
+                    schedule_train_dir_1: "Richtung: Sol / Chamartín",
+                    schedule_bus_title: "Rundbus (Linie 1)",
+                    schedule_bus_dir_1: "Richtung: Tenería / Bahnhof",
+                    schedule_every_20: "Alle 20 min (ca.)",
+                    hotel_pinto: "Pinto",
+                    hotel_madrid: "Madrid",
+                    hotel_spain_all: "Ganz Spanien",
+                    health_title: "Gesundheit & Apotheken",
+                    health_card_info_title: "Gesundheitskarte",
+                    health_card_info_eu: "Europäische Krankenversicherungskarte (EKVK)",
+                    health_card_info_eu_desc: "Wenn Sie EU-Bürger sind, berechtigt Sie diese Karte zur öffentlichen Gesundheitsversorgung in Spanien.",
+                    health_card_info_other: "Andere Länder",
+                    health_card_info_other_desc: "Wenn Sie von außerhalb der EU kommen, wird eine private Reiseversicherung dringend empfohlen.",
+                    health_hospitals: "Krankenhäuser",
+                    health_centers: "Gesundheitszentren",
+                    health_pharmacies: "Apotheken",
+                    health_pharmacies_pinto: "Apotheken in Pinto",
+                    health_pharmacies_spain: "Wichtige Apotheken (Spanien)",
+                    health_services: "Dienstleistungen:",
+                    bank_title: "Banken & Dienstleistungen",
+                    gastro_title_lujo: "Luxusrestaurants",
+                    gastro_title_local: "Lokale Juwelen",
+                    gastro_reviews: "Nutzerbewertungen",
+                    gastro_popular: "Beliebte Gerichte",
+                    gastro_location: "Standort",
+                    price_cheap: "Günstig",
+                    price_normal: "Normal",
+                    price_expensive: "Teuer",
+                    sports_title: "Fitnessstudios",
+                    price_month: "pro Monat",
+                    hours_title: "Öffnungszeiten",
+                    // --- FIN NUEVOS DATOS ---
+                    prof_favs: "Favoriten", prof_routes: "Meine Routen", prof_lang: "Sprache", prof_dark: "Dunkelmodus",
+                    favs_empty: "Keine Favoriten.", routes_user_empty: "Keine Routen erstellt.",
+                    create_route_title: "Eigene Route",
+                    map_all: "Alle", map_history: "Kultur", map_nature: "Natur", map_food: "Essen", map_hotel: "Schlafen", map_leisure: "Freizeit", map_shop: "Einkaufen",
+                    // Events
+                    events_upcoming: "Kommende Events",
+                    events_desc_fiestas: "Musik, Attraktionen und Prozession.",
+                    events_desc_carnaval: "Paraden und Kostümwettbewerb.",
+                    // New Booking Section
+                    book_title: "Wählen Sie Ihre Buchung",
+                    book_hotel_es: "Hotel (Pinto/Spanien)",
+                    book_taxi: "Taxi",
+                    book_uber: "Uber",
+                    book_bike: "Fahrrad",
+                    book_car: "Mietwagen",
+                    pay_example_title: "Beispiel: Taxi-Buchung",
+                    pay_example_price: "15€",
+                    // --- NEW TRANSLATIONS ---
+                    route_generator_title: "Erstellen Sie Ihre Route",
+                    route_q_name: "Name der Route?",
+                    route_name_ph: "Z.B.: Wochenende in Pinto",
+                    route_q_style: "Wie soll Ihre Route sein?",
+                    style_relax: "Ruhig",
+                    style_challenge: "Neue Herausforderungen",
+                    style_action: "Mit Spannung",
+                    style_photos: "Für gute Fotos",
+                    style_romantic: "Romantisch",
+                    style_inspiration: "Inspiration",
+                    style_family: "Mit Familie",
+                    style_extreme: "Intensiv (Sportler)",
+                    route_q_where: "Wo?",
+                    where_random: "Zufällig",
+                    where_pinto: "Pinto",
+                    route_q_pets: "Haustiere?",
+                    pets_yes: "Ja",
+                    pets_no: "Nein",
+                    route_q_time: "Uhrzeit?",
+                    time_morning: "Super! Früh am Morgen.",
+                    time_midday: "Perfekt für eine Mittagspause.",
+                    time_afternoon: "Ideal für den Nachmittag!",
+                    time_night: "Ein nächtliches Abenteuer.",
+                    generate_btn: "Generieren & Speichern",
+                    // Save Route
+                    save_route_btn: "Zu Meinen Routen hinzufügen",
+                    route_saved_success: "Route gespeichert:",
+                    route_deleted_success: "Route gelöscht",
+                    back_modal: "Zurück",
+                    view_btn: "Ansehen",
+                    delete_btn: "Löschen",
+                    // España
+                    spain_map_title: "Interaktive Karte von Spanien",
+                    spain_map_tourist: "Touristen",
+                    spain_map_local: "Lokal",
+                    spain_map_hidden: "Versteckt",
+                    // Cine
+                    cinema_pinto_title: "Kinos in Pinto & Nähe",
+                    cinema_box_office: "Kinokassen Spanien",
+                    buy_tickets: "Tickets Kaufen"
+                }
+            },
+            places: [
+                // Cultura & Historia
+                { id: 1, category: "history", name: "Torre de Éboli", desc: "Torre histórica del s.XIV", lat: 40.2416, lng: -3.7005, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Torre_de_Éboli_(Pinto)_01.jpg/640px-Torre_de_Éboli_(Pinto)_01.jpg" },
+                { id: 3, category: "history", name: "Iglesia Sto. Domingo", desc: "Arquitectura gótica", lat: 40.2430, lng: -3.7020, img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Iglesia_de_Santo_Domingo_de_Silos_(Pinto)_02.jpg/640px-Iglesia_de_Santo_Domingo_de_Silos_(Pinto)_02.jpg" },
+                
+                // Naturaleza
+                { id: 2, category: "nature", name: "Parque Juan Carlos I", desc: "Gran pulmón verde", lat: 40.2480, lng: -3.6980, img: "httpsD://pinto.es/wp-content/uploads/2019/05/Parque-Juan-Carlos-I-Pinto-1024x683.jpg" },
+                { id: 4, category: "nature", name: "Parque del Egido", desc: "Parque céntrico y clásico", lat: 40.2400, lng: -3.7050, img: "https://fastly.4sqi.net/img/general/600x600/54858423_E4H8f8yJ4Z6yJ4Z6yJ4Z6yJ4Z6yJ4Z6yJ4Z6yJ4Z6yJ4.jpg" },
+
+                // Hoteles
+                { id: 5, category: "hotel", name: "Hotel Princesa de Éboli", desc: "Alojamiento 4 estrellas", lat: 40.2390, lng: -3.6950, img: "https://cf.bstatic.com/xdata/images/hotel/max1024x768/46509918.jpg?k=c4325e3703939e52b6840e50d0123570d33b2a8a00e236326536514874027d3a&o=&hp=1" },
+
+                // Compras
+                { id: 6, category: "shop", name: "CC Plaza Éboli", desc: "Centro comercial principal", lat: 40.2380, lng: -3.6920, img: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/10/e8/e4/5e/cc-plaza-eboli.jpg?w=1200&h=-1&s=1" },
+
+                // Restaurantes
+                { id: 7, category: "food", name: "Restaurante Panpintao", desc: "Comida tradicional premiada", lat: 40.2425, lng: -3.7010, img: "https://media-cdn.tripadvisor.com/media/photo-s/1a/6d/8f/3e/panpintao.jpg" },
+                { id: 8, category: "food", name: "Pizzería La Strada", desc: "Pizzas artesanas", lat: 40.2440, lng: -3.6990, img: "https://media-cdn.tripadvisor.com/media/photo-s/15/c5/0c/6c/pizzeria-la-strada.jpg" },
+                { id: 9, category: "food", name: "Hamburguesería La Huella", desc: "Burgers gourmet", lat: 40.2410, lng: -3.7030, img: "https://media-cdn.tripadvisor.com/media/photo-s/1b/46/50/50/hamburguesa.jpg" },
+
+                // Ocio
+                { id: 10, category: "leisure", name: "Sala Groobe", desc: "Discoteca y eventos", lat: 40.2350, lng: -3.6900, img: "https.://pbs.twimg.com/profile_images/1111111111/default_400x400.png" },
+                { id: 11, category: "leisure", name: "Bowling Pinto", desc: "Bolera y recreativos", lat: 40.2375, lng: -3.6915, img: "https.://fastly.4sqi.net/img/general/600x600/234234_sdfsdf.jpg" }
+            ],
+            movies: [
+                { title: "Dolor y Gloria", dir: "Almodóvar", rating: 4.8 },
+                { title: "El Laberinto del Fauno", dir: "Del Toro", rating: 4.9 },
+                { title: "La Casa de Papel", dir: "Netflix", rating: 4.7 }
+            ]
+        };
+
+        /**
+         * CORE APPLICATION LOGIC
+         */
+        const App = {
+            state: {
+                lang: 'es',
+                theme: 'light',
+                user: null,
+                currentView: 'home',
+                history: [],
+                mapInstance: null,
+                mapMarkers: [],
+                spainMapInstance: null, // NUEVO
+                spainMapMarkers: [] // NUEVO
+            },
+
+            init() {
+                this.loadSettings();
+                this.applyTheme();
+                this.renderView('home');
+                this.setupListeners();
+                console.log("PintoGuide iOS initialized.");
+            },
+
+            // --- State & Storage ---
+            loadSettings() {
+                const saved = localStorage.getItem('pinto_app_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    this.state.lang = parsed.lang || 'es';
+                    this.state.theme = parsed.theme || 'light';
+                    this.state.user = parsed.user || null;
+                }
+            },
+            saveSettings() {
+                localStorage.setItem('pinto_app_state', JSON.stringify({
+                    lang: this.state.lang,
+                    theme: this.state.theme,
+                    user: this.state.user
+                }));
+            },
+
+            // --- Internationalization ---
+            t(key) {
+                const dict = DB.i18n[this.state.lang] || DB.i18n['en'];
+                return key.split('.').reduce((obj, i) => obj ? obj[i] : null, dict) || key;
+            },
+            
+            updateLanguage(lang) {
+                this.state.lang = lang;
+                this.saveSettings();
+                this.renderView(this.state.currentView);
+                this.updateNavLabels();
+            },
+
+            updateNavLabels() {
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    el.innerText = this.t(el.dataset.i18n);
+                });
+            },
+
+            // --- Theme ---
+            toggleTheme() {
+                this.state.theme = this.state.theme === 'light' ? 'dark' : 'light';
+                this.applyTheme();
+                this.saveSettings();
+            },
+            applyTheme() {
+                if (this.state.theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            },
+
+            // --- Auth ---
+            login(username) {
+                UI.showLoading(true);
+                setTimeout(() => {
+                    this.state.user = { name: username, favorites: [], itineraries: [] };
+                    this.saveSettings();
+                    UI.showLoading(false);
+                    UI.showToast(`${App.t('auth_welcome')}, ${username}`, 'success');
+                    this.renderView('profile');
+                }, 1000);
+            },
+            logout() {
+                this.state.user = null;
+                this.saveSettings();
+                UI.showToast(this.t('auth_logout'), 'info');
+                this.renderView('profile');
+            },
+
+            // --- Navigation ---
+            navigate(viewName, params = {}) {
+                if (this.state.currentView === viewName && !params.force) return;
+                
+                // Limpiar instancia de mapa si salimos de la vista de mapa
+                if (this.state.currentView === 'map' && viewName !== 'map' && this.state.mapInstance) {
+                    this.state.mapInstance.remove();
+                    this.state.mapInstance = null;
+                }
+                // --- INICIO DE MODIFICACIÓN ---
+                // Limpiar instancia de mapa de España
+                if (this.state.currentView === 'spain' && viewName !== 'spain' && this.state.spainMapInstance) {
+                    this.state.spainMapInstance.remove();
+                    this.state.spainMapInstance = null;
+                }
+                // --- FIN DE MODIFICACIÓN ---
+
+                if (!params.force) { // No añadir al historial si es una recarga forzada (como en goBack)
+                    this.state.history.push(this.state.currentView);
+                }
+                this.state.currentView = viewName;
+                
+                // Update Tab Active State
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    const mainViews = ['home', 'pinto', 'itineraries', 'search', 'profile'];
+                    if(mainViews.includes(viewName) && btn.dataset.target === viewName) {
+                        btn.classList.add('text-ios-blue');
+                        btn.classList.remove('text-gray-400');
+                    } else if (mainViews.includes(btn.dataset.target)) { // Solo desactiva las pestañas principales
+                        btn.classList.remove('text-ios-blue');
+                        btn.classList.add('text-gray-400');
+                    }
+                });
+
+                // Show/Hide Back Button
+                const backBtn = document.getElementById('back-btn');
+                const mainViews = ['home', 'pinto', 'itineraries', 'search', 'profile'];
+                if (!mainViews.includes(viewName)) {
+                    backBtn.classList.remove('hidden');
+                } else {
+                    backBtn.classList.add('hidden');
+                }
+
+                this.renderView(viewName, params);
+            },
+
+            goBack() {
+                const prev = this.state.history.pop();
+                
+                // Limpiar instancia de mapa si salimos de la vista de mapa
+                if (this.state.currentView === 'map' && this.state.mapInstance) {
+                    this.state.mapInstance.remove();
+                    this.state.mapInstance = null;
+                }
+                // --- INICIO DE MODIFICACIÓN ---
+                // Limpiar instancia de mapa de España
+                if (this.state.currentView === 'spain' && this.state.spainMapInstance) {
+                    this.state.spainMapInstance.remove();
+                    this.state.spainMapInstance = null;
+                }
+                // --- FIN DE MODIFICACIÓN ---
+
+                if (prev) {
+                    this.state.currentView = prev; // Set current view ANTES de navegar
+                    // Forzamos la navegación para actualizar la UI del botón de atrás y pestañas
+                    this.navigate(prev, { force: true }); 
+                } else {
+                    this.navigate('home');
+                }
+            },
+
+            // --- View Rendering Engine ---
+            renderView(viewName, params = {}) {
+                const container = document.getElementById('app-container');
+                container.innerHTML = ''; // Clear
+                
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Gestionar el overflow del contenedor principal
+                if (viewName === 'map' || viewName === 'spain') { // MODIFICADO: Aplicar también a 'spain'
+                    container.classList.remove('overflow-y-auto', 'px-4');
+                    container.classList.add('overflow-hidden', 'p-4'); // Dejamos p-4 para 'spain'
+                } else {
+                    container.classList.add('overflow-y-auto', 'px-4');
+                    container.classList.remove('overflow-hidden', 'p-0');
+                }
+                
+                if (viewName === 'map') { // Específico para 'map'
+                     container.classList.remove('p-4');
+                     container.classList.add('p-0');
+                }
+                // --- FIN DE LA MODIFICACIÓN ---
+
+                const wrapper = document.createElement('div');
+                
+                // MODIFICACIÓN: Quitar 'space-y-4' por defecto y añadirlo a cada vista
+                wrapper.className = 'page-transition'; 
+
+                let title = "Pinto Guide";
+
+                switch(viewName) {
+                    case 'home':
+                        title = this.t('welcome');
+                        wrapper.innerHTML = Views.home();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'pinto':
+                        title = this.t('sections.pinto');
+                        wrapper.innerHTML = Views.pinto();
+                        wrapper.classList.add('space-y-4');
+                        break;
+                    case 'itineraries':
+                        title = this.t('nav_trips');
+                        wrapper.innerHTML = Views.itineraries();
+                        wrapper.classList.add('space-y-4');
+                        break;
+                    case 'search': // ESTA ES AHORA LA NUEVA CENTRAL DE RESERVAS
+                        title = this.t('nav_search');
+                        wrapper.innerHTML = Views.search();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'profile':
+                        title = this.t('nav_profile');
+                        wrapper.innerHTML = Views.profile();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'spain':
+                        title = this.t('sections.spain');
+                        wrapper.innerHTML = Views.spain();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        // --- INICIO DE MODIFICACIÓN ---
+                        // Asegurar que el wrapper tenga altura para el mapa
+                        wrapper.classList.add('h-full', 'flex', 'flex-col');
+                        setTimeout(() => App.initSpainMap('all'), 50); // NUEVO
+                        // --- FIN DE MODIFICACIÓN ---
+                        break;
+                    // --- INICIO NUEVA SECCIÓN ---
+                    case 'cinema':
+                        title = this.t('sections.cinema');
+                        wrapper.innerHTML = Views.cinema();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'health':
+                        title = this.t('sections.health');
+                        wrapper.innerHTML = Views.health();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'banks':
+                        title = this.t('sections.banks');
+                        wrapper.innerHTML = Views.banks();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'gastronomy':
+                        title = this.t('sections.gastronomy');
+                        wrapper.innerHTML = Views.gastronomy();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'sports':
+                        title = this.t('sections.sports');
+                        wrapper.innerHTML = Views.sports();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    // --- FIN NUEVA SECCIÓN ---
+                    case 'mobility': // --- SECCIÓN RESTAURADA ---
+                        title = this.t('sections.guide_mob');
+                        wrapper.innerHTML = Views.mobility();
+                        wrapper.classList.add('space-y-4');
+                        break;
+                    case 'map':
+                        title = this.t('sections.map');
+                        wrapper.innerHTML = Views.map();
+                        // MODIFICACIÓN: Clases especiales para que el mapa ocupe toda la altura
+                        wrapper.classList.add('h-full', 'flex', 'flex-col'); 
+                        setTimeout(() => this.initMap('all'), 50); // Reducido timeout
+                        break;
+                    case 'hotels': // VISTA RENOMBRADA (ANTES ERA 'search')
+                        title = this.t('book_tab_hotel');
+                        wrapper.innerHTML = Views.hotels();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'events': // NUEVA VISTA
+                        title = this.t('sections.events');
+                        wrapper.innerHTML = Views.events();
+                        wrapper.classList.add('space-y-4'); 
+                        break;
+                    case 'favs_list':
+                        title = this.t('prof_favs');
+                        wrapper.innerHTML = Views.favoritesList();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    case 'routes_list':
+                        title = this.t('prof_routes');
+                        wrapper.innerHTML = Views.routesList();
+                        wrapper.classList.add('space-y-4'); // Añadido
+                        break;
+                    default:
+                        wrapper.innerHTML = `<div class="p-4 text-center">View not found</div>`;
+                }
+
+                document.getElementById('page-title').innerText = title;
+                container.appendChild(wrapper);
+            },
+
+            // --- Features Logic ---
+            initMap(filter = 'all') {
+                const mapElement = document.getElementById('map');
+                // Salir si el elemento del mapa no está presente
+                if (!mapElement) {
+                    console.warn("El elemento #map no se encontró en el DOM. Esperando...");
+                    setTimeout(() => this.initMap(filter), 100); // Reintentar
+                    return;
+                }
+
+                // Initialize Map if not exists
+                if (!this.state.mapInstance) {
+                    console.log("Creando nueva instancia de mapa");
+                    this.state.mapInstance = L.map('map').setView([40.2416, -3.7005], 15);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '',
+                        maxZoom: 19
+                    }).addTo(this.state.mapInstance);
+                } else {
+                    console.log("Refrescando tamaño de mapa");
+                    // Just fix size if re-entering view
+                    setTimeout(() => {
+                        if (this.state.mapInstance) {
+                            this.state.mapInstance.invalidateSize();
+                        }
+                    }, 100);
+                }
+
+                // Clear existing markers
+                this.state.mapMarkers.forEach(m => this.state.mapInstance.removeLayer(m));
+                this.state.mapMarkers = [];
+
+                // Filter Places
+                const placesToShow = filter === 'all' 
+                    ? DB.places 
+                    : DB.places.filter(p => p.category === filter);
+
+                // Define Colors for categories
+                const catColors = {
+                    history: '#FF3B30', // red
+                    nature: '#34C759', // green
+                    hotel: '#AF52DE', // purple
+                    shop: '#FF9500', // orange
+                    food: '#007AFF', // blue
+                    leisure: '#AC8E68' // brown
+                };
+
+                placesToShow.forEach(place => {
+                    const color = catColors[place.category] || '#8E8E93'; // gray
+                    
+                    // Custom Circle Marker to look cleaner
+                    const marker = L.circleMarker([place.lat, place.lng], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(this.state.mapInstance);
+
+                    marker.bindPopup(`
+                        <div class="text-center w-40">
+                            <img src="${place.img}" class="w-full h-20 object-cover rounded-md mb-2" onerror="this.src='https://placehold.co/160x80/f0f0f0/ccc?text=Pinto'">
+                            <b class="text-sm">${place.name}</b><br>
+                            <span class="text-xs text-gray-500">${place.desc}</span>
+                        </div>
+                    `);
+                    
+                    this.state.mapMarkers.push(marker);
+                });
+            },
+
+            updateMapFilter(category) {
+                // Update active state of buttons
+                document.querySelectorAll('.map-filter-btn').forEach(btn => {
+                    if(btn.dataset.filter === category) {
+                        btn.classList.add('bg-ios-blue', 'text-white');
+                        btn.classList.remove('bg-white', 'text-gray-600', 'dark:bg-ios-card', 'dark:text-gray-300');
+                    } else {
+                        btn.classList.remove('bg-ios-blue', 'text-white');
+                        btn.classList.add('bg-white', 'text-gray-600', 'dark:bg-ios-card', 'dark:text-gray-300');
+                    }
+                });
+                this.initMap(category);
+            },
+
+            // --- INICIO NUEVA FUNCIÓN ---
+            initSpainMap(filter = 'all') {
+                const mapElement = document.getElementById('spain-map');
+                if (!mapElement) {
+                    console.warn("Elemento #spain-map no encontrado, reintentando...");
+                    setTimeout(() => this.initSpainMap(filter), 100);
+                    return;
+                }
+
+                // Inicializar mapa si no existe
+                if (!this.state.spainMapInstance) {
+                    console.log("Creando instancia de mapa de España");
+                    this.state.spainMapInstance = L.map('spain-map').setView([40.41, -3.7], 6); // Centrado en España
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '',
+                        maxZoom: 19
+                    }).addTo(this.state.spainMapInstance);
+                } else {
+                     setTimeout(() => {
+                        if (this.state.spainMapInstance) {
+                            this.state.spainMapInstance.invalidateSize();
+                        }
+                    }, 100);
+                }
+
+                // Limpiar marcadores
+                this.state.spainMapMarkers.forEach(m => this.state.spainMapInstance.removeLayer(m));
+                this.state.spainMapMarkers = [];
+
+                // Filtrar sitios
+                const placesToShow = filter === 'all' 
+                    ? DB.spainLocations 
+                    : DB.spainLocations.filter(p => p.type === filter);
+
+                // Colores para tipos
+                const typeColors = {
+                    tourist: '#FF3B30', // red
+                    local: '#007AFF', // blue
+                    hidden: '#34C759' // green
+                };
+
+                placesToShow.forEach(place => {
+                    const color = typeColors[place.type] || '#8E8E93';
+                    const marker = L.circleMarker([place.lat, place.lng], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(this.state.spainMapInstance);
+
+                    marker.bindPopup(`
+                        <div class="text-center w-40">
+                            <b class="text-sm">${place.name}</b><br>
+                            <span class="text-xs text-gray-500">${place.city}</span>
+                        </div>
+                    `);
+                    this.state.spainMapMarkers.push(marker);
+                });
+            },
+
+            filterSpainMap(category) {
+                // Actualizar botones
+                document.querySelectorAll('.spain-map-btn').forEach(btn => {
+                    if (btn.dataset.filter === category) {
+                        btn.classList.add('bg-ios-blue', 'text-white');
+                        btn.classList.remove('bg-white', 'dark:bg-ios-card', 'text-gray-600', 'dark:text-gray-300');
+                    } else {
+                        btn.classList.remove('bg-ios-blue', 'text-white');
+                        btn.classList.add('bg-white', 'dark:bg-ios-card', 'text-gray-600', 'dark:text-gray-300');
+                    }
+                });
+                // --- INICIO DE MODIFICACIÓN ---
+                // Llamar a initSpainMap para filtrar
+                App.initSpainMap(category);
+                // --- FIN DE MODIFICACIÓN ---
+            },
+            
+            filterHotels(location) {
+                // Actualizar botones
+                document.querySelectorAll('.hotel-filter-btn').forEach(btn => {
+                    if (btn.dataset.filter === location) {
+                        btn.classList.add('bg-ios-blue', 'text-white');
+                        btn.classList.remove('bg-white', 'dark:bg-ios-card', 'text-gray-600', 'dark:text-gray-300');
+                    } else {
+                        btn.classList.remove('bg-ios-blue', 'text-white');
+                        btn.classList.add('bg-white', 'dark:bg-ios-card', 'text-gray-600', 'dark:text-gray-300');
+                    }
+                });
+                
+                // Filtrar lista de hoteles
+                document.querySelectorAll('.hotel-list-item').forEach(item => {
+                    if (location === 'Toda España' || item.dataset.location === location) { // 'Toda España' muestra todos
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                // Actualizar el placeholder de búsqueda
+                const searchInput = document.querySelector('#app-container input[type="text"]');
+                if (searchInput) {
+                    if (location === 'Toda España') {
+                        searchInput.placeholder = App.t('book_search_ph');
+                    } else {
+                        searchInput.placeholder = `${App.t('book_search_ph').split('...')[0]} en ${location}...`;
+                    }
+                }
+            },
+            
+            showRestaurantDetails(id) {
+                const r = DB.restaurants.find(res => res.id === id);
+                if (!r) return;
+
+                let reviewsHTML = r.reviews.map(review => `
+                    <div class="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
+                        <p class="text-sm dark:text-white">"<em>${review.text}</em>"</p>
+                        <p class="text-xs text-gray-500 text-right font-semibold">- ${review.user}</p>
+                    </div>
+                `).join('');
+
+                let dishesHTML = r.popularDishes.map(dish => `
+                    <li class="flex justify-between text-sm">
+                        <span class="dark:text-gray-300">${dish.name}</span>
+                        <span class="font-bold dark:text-white">${dish.price}</span>
+                    </li>
+                `).join('');
+
+                const html = `
+                    <div>
+                        <h4 class="font-semibold dark:text-white">${App.t('gastro_location')}</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">${r.location}</p>
+                        
+                        <h4 class="font-semibold dark:text-white">${App.t('gastro_popular')}</h4>
+                        <ul class="space-y-2 mb-4">${dishesHTML}</ul>
+                        
+                        <h4 class="font-semibold dark:text-white">${App.t('gastro_reviews')}</h4>
+                        <div class="mt-2">${reviewsHTML}</div>
+                    </div>
+                `;
+                
+                UI.showModal(r.name, html);
+            },
+            // --- FIN NUEVA FUNCIÓN ---
+
+            toggleFavorite(id, btn) {
+                if (!this.state.user) {
+                    UI.showToast(this.t('msg_login_req'), 'error');
+                    return;
+                }
+                const index = this.state.user.favorites.indexOf(id);
+                if (index > -1) {
+                    this.state.user.favorites.splice(index, 1);
+                    btn.querySelector('i').classList.replace('fa-solid', 'fa-regular');
+                    btn.querySelector('i').classList.remove('text-red-500');
+                } else {
+                    this.state.user.favorites.push(id);
+                    btn.querySelector('i').classList.replace('fa-regular', 'fa-solid');
+                    btn.querySelector('i').classList.add('text-red-500');
+                    UI.showToast(this.t('prof_favs') + " +", 'success');
+                }
+                this.saveSettings();
+            },
+
+            processPayment(method) {
+                UI.closeModal();
+                UI.showLoading(true, "Procesando...");
+                setTimeout(() => {
+                    UI.showLoading(false);
+                    if (method === 'cash') {
+                        UI.showModal(this.t('pay_modal_title'), "Garantía Requerida / Guarantee Required");
+                    } else {
+                        UI.showToast("OK", 'success');
+                    }
+                }, 2000);
+            },
+
+            // New Itinerary Logic
+            loadRoute(type, typeName) {
+                UI.showModal(typeName, `
+                    <div class="flex flex-col items-center py-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-ios-blue mb-2"></div>
+                        <p>${this.t('itinerary_generating')}</p>
+                    </div>
+                `);
+
+                setTimeout(() => {
+                    // Get Data
+                    const routeData = DB.routeContent[type];
+                    
+                    // --- INICIO DE MODIFICACIÓN ---
+                    let html = Views.buildRouteSteps(routeData.steps);
+
+                    // Añadir botones de acción (Guardar y Volver)
+                    const actionButtonsHTML = `
+                        <div class="flex gap-4 mt-6">
+                            <button onclick="UI.closeModal()" class="w-full bg-gray-200 dark:bg-gray-700 text-black dark:text-white py-3 rounded-xl font-bold tap-active">
+                                ${App.t('back_modal')}
+                            </button>
+                            <button onclick='App.saveGeneratedRoute("${typeName}", ${JSON.stringify(routeData.steps)})' class="w-full bg-ios-blue text-white py-3 rounded-xl font-bold tap-active">
+                                <i class="fa-solid fa-plus-circle mr-2"></i> ${App.t('save_route_btn')}
+                            </button>
+                        </div>
+                    `;
+                    html += actionButtonsHTML;
+                    // --- FIN DE MODIFICACIÓN ---
+
+                    UI.updateModalContent(typeName, html);
+                }, 1500);
+            },
+
+            openCreateRouteModal() { // Esta función ahora abre el generador
+                if (!this.state.user) {
+                    UI.showToast(this.t('msg_login_req'), 'error');
+                    return;
+                }
+                // --- INICIO DE MODIFICACIÓN ---
+                // Cargar el HTML del formulario desde Views
+                const formHTML = Views.createRouteForm();
+                UI.showModal(this.t('route_generator_title'), formHTML);
+                // --- FIN DE MODIFICACIÓN ---
+            },
+
+            // --- INICIO DE NUEVA FUNCIÓN ---
+            // Lógica para el mensaje motivacional del input time
+            updateTimeMotivation(timeValue) {
+                const motivationEl = document.getElementById('time-motivation');
+                if (!motivationEl) return;
+
+                const hour = parseInt(timeValue.split(':')[0], 10);
+                let message = '';
+                if (hour >= 5 && hour < 12) {
+                    message = App.t('time_morning');
+                } else if (hour >= 12 && hour < 16) {
+                    message = App.t('time_midday');
+                } else if (hour >= 16 && hour < 21) {
+                    message = App.t('time_afternoon');
+                } else {
+                    message = App.t('time_night');
+                }
+                motivationEl.innerText = message;
+                motivationEl.classList.remove('hidden');
+            },
+
+            // Genera una ruta custom (simulado)
+            generateCustomRoute() {
+                // --- INICIO DE MODIFICACIÓN ---
+                const routeNameInput = document.getElementById('custom-route-name');
+                let typeName = routeNameInput.value;
+                
+                if (!typeName) {
+                    UI.showToast(App.t('route_name_ph'), "error"); // Usamos el placeholder como error
+                    routeNameInput.focus();
+                    return;
+                }
+                
+                // Simulación de generación
+                UI.showLoading(true, App.t('itinerary_generating'));
+                
+                setTimeout(() => {
+                    // Generar pasos aleatorios (simulación)
+                    const steps = DB.routeContent.custom.steps; // Usar la simulación de DB
+
+                    // Guardar la ruta directamente
+                    this.saveGeneratedRoute(typeName, steps, {
+                        closeModal: true,
+                        showToast: true,
+                        refreshView: true
+                    });
+                    
+                    UI.showLoading(false);
+                    
+                }, 1500); // Simular tiempo de generación
+                // --- FIN DE MODIFICACIÓN ---
+            },
+
+            // Guarda la ruta generada
+            saveGeneratedRoute(name, steps, options = {}) {
+                // --- INICIO DE MODIFICACIÓN ---
+                // Configuración por defecto
+                const config = {
+                    closeModal: true,
+                    showToast: true,
+                    refreshView: true,
+                    ...options
+                };
+                
+                if (!this.state.user) {
+                    UI.showToast(this.t('msg_login_req'), 'error');
+                    return;
+                }
+                // --- FIN DE MODIFICACIÓN ---
+
+                // Convertir steps (que es un string JSON) de nuevo a objeto
+                if (typeof steps === 'string') {
+                    steps = JSON.parse(steps);
+                }
+
+                const newRoute = {
+                    id: Date.now(),
+                    name: name, // Usamos el nombre del tipo (ej. "Familia" o "Ruta Personalizada")
+                    date: new Date().toLocaleDateString(),
+                    steps: steps // Guardamos los pasos
+                };
+                
+                this.state.user.itineraries.push(newRoute);
+                this.saveSettings();
+                
+                // --- INICIO DE MODIFICACIÓN ---
+                if (config.closeModal) UI.closeModal();
+                if (config.showToast) UI.showToast(`${App.t('route_saved_success')} ${name}`, 'success');
+                if (config.refreshView) this.renderView('itineraries'); // Refresh
+                // --- FIN DE MODIFICACIÓN ---
+            },
+            
+            // Ver una ruta guardada
+            viewSavedRoute(id) {
+                if (!this.state.user) return;
+                const route = this.state.user.itineraries.find(r => r.id === id);
+                if (!route) return;
+                
+                const html = Views.buildRouteSteps(route.steps);
+                UI.showModal(route.name, html);
+            },
+
+            // Borrar una ruta guardada
+            deleteSavedRoute(id, btn) {
+                if (!this.state.user) return;
+                
+                const index = this.state.user.itineraries.findIndex(r => r.id === id);
+                if (index > -1) {
+                    this.state.user.itineraries.splice(index, 1);
+                    this.saveSettings();
+                    
+                    // Eliminar del DOM
+                    btn.closest('.route-list-item').remove();
+                    
+                    UI.showToast(this.t('route_deleted_success'), 'info');
+                    
+                    // Comprobar si la lista está vacía
+                    if (this.state.user.itineraries.length === 0) {
+                        this.renderView('itineraries'); // Recargar para mostrar mensaje vacío
+                    }
+                }
+            },
+            // --- FIN DE NUEVAS FUNCIONES ---
+
+            setupListeners() {
+                // Delegate
+            }
+        };
+
+        /**
+         * UI COMPONENTS
+         */
+        const Views = {
+            home() {
+                return `
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-400 rounded-2xl p-4 text-white shadow-lg mb-6 relative overflow-hidden">
+                        <div class="flex justify-between items-center z-10 relative">
+                            <div>
+                                <h2 class="text-2xl font-bold">Pinto, ES</h2>
+                                <p class="text-blue-100 text-sm">Soleado</p>
+                            </div>
+                            <div class="text-4xl font-thin">24°</div>
+                        </div>
+                        <i class="fa-solid fa-sun absolute -bottom-4 -right-4 text-8xl text-white/20"></i>
+                    </div>
+
+                    <h3 class="text-lg font-bold mb-3 dark:text-white">${App.t('discover')}</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        ${this.cardBig(App.t('sections.pinto'), 'fa-tower-observation', 'bg-orange-500', "App.navigate('pinto')")}
+                        ${this.cardBig(App.t('sections.spain'), 'fa-flag', 'bg-red-500', "App.navigate('spain')")}
+                        ${this.cardBig(App.t('sections.map'), 'fa-map', 'bg-green-500', "App.navigate('map')")}
+                        ${this.cardBig(App.t('sections.cinema'), 'fa-film', 'bg-purple-500', "App.navigate('cinema')")} 
+                        <!-- NUEVOS BOTONES -->
+                        ${this.cardBig(App.t('sections.health'), 'fa-heart-pulse', 'bg-pink-500', "App.navigate('health')")} 
+                        ${this.cardBig(App.t('sections.gastronomy'), 'fa-utensils', 'bg-teal-500', "App.navigate('gastronomy')")} 
+                        ${this.cardBig(App.t('sections.sports'), 'fa-dumbbell', 'bg-blue-500', "App.navigate('sports')")} 
+                        ${this.cardBig(App.t('sections.banks'), 'fa-landmark', 'bg-indigo-500', "App.navigate('banks')")} 
+                    </div>
+
+                    <h3 class="text-lg font-bold mb-3 dark:text-white">${App.t('featured')}</h3>
+                    <div class="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x">
+                        ${DB.places.map(p => `
+                            <div class="min-w-[200px] bg-white dark:bg-ios-card rounded-xl shadow-sm overflow-hidden snap-center place-card">
+                                <img src="${p.img}" class="w-full h-28 object-cover" onerror="this.src='https://placehold.co/200x112/f0f0f0/ccc?text=Pinto'">
+                                <div class="p-3">
+                                    <div class="flex justify-between items-start">
+                                        <h4 class="font-semibold text-sm dark:text-white">${p.name}</h4>
+                                        <button onclick="App.toggleFavorite(${p.id}, this)" class="text-gray-400 tap-active"><i class="fa-${App.state.user?.favorites.includes(p.id) ? 'solid text-red-500' : 'regular'} fa-heart"></i></button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${p.desc}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+
+            pinto() {
+                return `
+                    <div class="bg-white dark:bg-ios-card rounded-xl p-4 mb-4 shadow-sm">
+                        <h2 class="text-xl font-bold mb-2">${App.t('sections.geo_center')}</h2>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+                            ${App.t('sections.pinto_desc')}
+                        </p>
+                    </div>
+                    <div class="grid gap-4">
+                        <button onclick="App.navigate('events')" class="w-full bg-ios-light dark:bg-gray-800 p-4 rounded-xl flex items-center justify-between tap-active">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-yellow-500 w-8 h-8 rounded-full flex items-center justify-center text-white"><i class="fa-solid fa-calendar-check"></i></div>
+                                <span class="font-medium dark:text-white">${App.t('sections.events')}</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                        </button>
+                         <button onclick="App.navigate('hotels')" class="w-full bg-ios-light dark:bg-gray-800 p-4 rounded-xl flex items-center justify-between tap-active">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-purple-500 w-8 h-8 rounded-full flex items-center justify-center text-white"><i class="fa-solid fa-bed"></i></div>
+                                <span class="font-medium dark:text-white">${App.t('sections.hotels_pinto')}</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <!-- BOTÓN RESTAURADO -->
+                         <button onclick="App.navigate('mobility')" class="w-full bg-ios-light dark:bg-gray-800 p-4 rounded-xl flex items-center justify-between tap-active">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-green-500 w-8 h-8 rounded-full flex items-center justify-center text-white"><i class="fa-solid fa-bus"></i></div>
+                                <span class="font-medium dark:text-white">${App.t('sections.guide_mob')}</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                        </button>
+                    </div>
+                `;
+            },
+
+            // *** INICIO DE NUEVA FUNCIÓN ***
+            createRouteForm() {
+                // HTML para el formulario del generador de rutas basado en el boceto
+                return `
+                    <div class="space-y-6">
+                        <!-- Pregunta 0: Nombre -->
+                        <div>
+                            <label for="custom-route-name" class="font-semibold dark:text-white">${App.t('route_q_name')}</label>
+                            <input type="text" id="custom-route-name" placeholder="${App.t('route_name_ph')}"
+                                   class="w-full p-3 mt-2 rounded-xl bg-gray-100 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white">
+                        </div>
+
+                        <!-- Pregunta 1: Estilo -->
+                        <div>
+                            <label class="font-semibold dark:text-white">${App.t('route_q_style')}</label>
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                ${this.formCheckbox('style_relax', App.t('style_relax'))}
+                                ${this.formCheckbox('style_challenge', App.t('style_challenge'))}
+                                ${this.formCheckbox('style_action', App.t('style_action'))}
+                                ${this.formCheckbox('style_photos', App.t('style_photos'))}
+                                ${this.formCheckbox('style_romantic', App.t('style_romantic'))}
+                                ${this.formCheckbox('style_inspiration', App.t('style_inspiration'))}
+                                ${this.formCheckbox('style_family', App.t('style_family'))}
+                                ${this.formCheckbox('style_extreme', App.t('style_extreme'))}
+                            </div>
+                        </div>
+
+                        <!-- Pregunta 2: Lugar -->
+                        <div>
+                            <label class="font-semibold dark:text-white">${App.t('route_q_where')}</label>
+                            <div class="flex gap-4 mt-2">
+                                ${this.formRadio('location', 'random', App.t('where_random'), true)}
+                                ${this.formRadio('location', 'pinto', App.t('where_pinto'))}
+                            </div>
+                        </div>
+
+                        <!-- Pregunta 3: Mascotas -->
+                        <div>
+                            <label class="font-semibold dark:text-white">${App.t('route_q_pets')}</label>
+                            <div class="flex gap-4 mt-2">
+                                ${this.formRadio('pets', 'yes', App.t('pets_yes'))}
+                                ${this.formRadio('pets', 'no', App.t('pets_no'), true)}
+                            </div>
+                        </div>
+
+                        <!-- Pregunta 4: Hora -->
+                        <div>
+                            <label for="route-time" class="font-semibold dark:text-white">${App.t('route_q_time')}</label>
+                            <input type="time" id="route-time" name="route-time" value="08:00" onchange="App.updateTimeMotivation(this.value)"
+                                   class="w-full p-3 mt-2 rounded-xl bg-gray-100 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white">
+                            <p id="time-motivation" class="text-xs text-gray-500 dark:text-gray-400 mt-2 p-2 bg-blue-50 dark:bg-blue-900/50 rounded-lg hidden"></p>
+                        </div>
+                        
+                        <!-- Botón Generar -->
+                        <button onclick="App.generateCustomRoute()" class="w-full bg-ios-blue text-white py-3 rounded-xl font-bold tap-active">
+                            ${App.t('generate_btn')}
+                        </button>
+                    </div>
+                `;
+            },
+
+            // Componentes helper para el formulario
+            formCheckbox(id, label) {
+                return `
+                    <label for="${id}" class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <input type="checkbox" id="${id}" name="${id}" class="h-5 w-5 text-blue-500 rounded border-gray-300 focus:ring-blue-500">
+                        <span class="text-sm dark:text-gray-300">${label}</span>
+                    </label>
+                `;
+            },
+
+            formRadio(name, id, label, isChecked = false) {
+                return `
+                    <label for="${id}" class="flex items-center gap-2 p-2">
+                        <input type="radio" id="${id}" name="${name}" ${isChecked ? 'checked' : ''} class="h-5 w-5 text-blue-500 border-gray-300 focus:ring-blue-500">
+                        <span class="text-sm dark:text-gray-300">${label}</span>
+                    </label>
+                `;
+            },
+
+            // Helper para construir la lista de pasos
+            buildRouteSteps(steps) {
+                let html = `<div class="space-y-4 mt-2">`;
+                steps.forEach(step => {
+                    html += `
+                        <div class="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <div class="text-xs font-bold text-gray-500 w-10">${step.time}</div>
+                            <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-500 flex items-center justify-center">
+                                <i class="fa-solid ${step.icon}"></i>
+                            </div>
+                            <span class="font-medium text-sm dark:text-white">${step.title}</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                return html;
+            },
+            // *** FIN DE NUEVAS FUNCIONES ***
+
+            map() {
+                return `
+                    <div class="flex flex-col h-full">
+                        <!-- Filters Overlay -->
+                        <div class="flex gap-2 overflow-x-auto py-2 mb-2 no-scrollbar px-4 pt-4">
+                            <button onclick="App.updateMapFilter('all')" class="map-filter-btn bg-ios-blue text-white px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="all">${App.t('map_all')}</button>
+                            <button onclick="App.updateMapFilter('history')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="history">${App.t('map_history')}</button>
+                            <button onclick="App.updateMapFilter('nature')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="nature">${App.t('map_nature')}</button>
+                            <button onclick="App.updateMapFilter('food')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="food">${App.t('map_food')}</button>
+                            <button onclick="App.updateMapFilter('hotel')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="hotel">${App.t('map_hotel')}</button>
+                            <button onclick="App.updateMapFilter('shop')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="shop">${App.t('map_shop')}</button>
+                            <button onclick="App.updateMapFilter('leisure')" class="map-filter-btn bg-white text-gray-600 dark:bg-ios-card dark:text-gray-300 px-4 py-2 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition-colors" data-filter="leisure">${App.t('map_leisure')}</button>
+                        </div>
+                        <div id="map" class="w-full flex-1 z-10 overflow-hidden relative"></div>
+                    </div>
+                `;
+            },
+
+            events() {
+                return `
+                    <h3 class="text-lg font-bold mb-3 dark:text-white">${App.t('events_upcoming')}</h3>
+                    <div class="space-y-4">
+                        <div class="bg-white dark:bg-ios-card rounded-xl overflow-hidden shadow-sm">
+                            <img src="https://pinto.es/wp-content/uploads/2023/08/Procesion-1-1024x683.jpeg" class="w-full h-32 object-cover" onerror="this.src='https://placehold.co/600x200/f0f0f0/ccc?text=Evento'">
+                            <div class="p-4">
+                                <span class="text-xs font-bold text-red-500">AGOSTO</span>
+                                <h4 class="font-bold dark:text-white mt-1">Fiestas del Cristo</h4>
+                                <p class="text-sm text-gray-500">${App.t('events_desc_fiestas')}</p>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-ios-card rounded-xl overflow-hidden shadow-sm">
+                             <img src="https.://pinto.es/wp-content/uploads/2024/02/IMG_1002-1024x683.jpg" class="w-full h-32 object-cover" onerror="this.src='https://placehold.co/600x200/f0f0f0/ccc?text=Evento'">
+                            <div class="p-4">
+                                <span class="text-xs font-bold text-purple-500">FEBRERO</span>
+                                <h4 class="font-bold dark:text-white mt-1">Carnaval de Pinto</h4>
+                                <p class="text-sm text-gray-500">${App.t('events_desc_carnaval')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // NUEVA VISTA: Central de Reservas (lo que antes era 'search')
+            search() {
+                return `
+                    <h3 class="text-lg font-bold mb-4 dark:text-white">${App.t('book_title')}</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${this.bookingHubCard(App.t('book_hotel_es'), 'fa-bed', 'bg-purple-500', "App.navigate('hotels')")}
+                        ${this.bookingHubCard(App.t('book_taxi'), 'fa-taxi', 'bg-yellow-500', `UI.openPaymentModal('${App.t('pay_example_title')}', '${App.t('pay_example_price')}')`)}
+                        ${this.bookingHubCard(App.t('book_uber'), 'fa-uber', 'bg-black', `UI.openPaymentModal('Uber', '12€')`)}
+                        ${this.bookingHubCard(App.t('book_bike'), 'fa-bicycle', 'bg-green-500', `UI.openPaymentModal('Alquiler Bici', '8€')`)}
+                        ${this.bookingHubCard(App.t('book_car'), 'fa-car', 'bg-blue-500', `UI.openPaymentModal('Coche Alquiler', '50€')`)}
+                    </div>
+                `;
+            },
+
+            bookingHubCard(title, icon, color, action) {
+                const iconClass = icon === 'fa-uber' ? 'fa-brands fa-uber' : `fa-solid ${icon}`;
+                return `
+                    <div onclick="${action}" class="bg-white dark:bg-ios-card p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 h-32 tap-active cursor-pointer">
+                        <div class="${color} w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shadow-md mb-1">
+                            <i class="${iconClass}"></i>
+                        </div>
+                        <span class="font-semibold text-sm dark:text-white text-center leading-tight">${title}</span>
+                    </div>
+                `;
+            },
+
+            itineraries() {
+                const types = [
+                    { id: 'fam', name: App.t('itinerary_family'), icon: 'fa-child-reaching', color: 'bg-orange-400' },
+                    { id: 'back', name: App.t('itinerary_backpack'), icon: 'fa-person-hiking', color: 'bg-green-500' },
+                    { id: 'lux', name: App.t('itinerary_luxury'), icon: 'fa-gem', color: 'bg-purple-500' },
+                    { id: 'adv', name: App.t('itinerary_adventure'), icon: 'fa-person-biking', color: 'bg-red-500' }
+                ];
+
+                return `
+                    <h3 class="text-lg font-bold mb-4 dark:text-white">${App.t('itinerary_title')}</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-8">
+                        ${types.map(t => `
+                            <div onclick="App.loadRoute('${t.id}', '${t.name}')" class="bg-white dark:bg-ios-card p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 h-32 tap-active cursor-pointer">
+                                <div class="${t.color} w-12 h-12 rounded-full flex items-center justify-center text-white text-xl shadow-lg">
+                                    <i class="fa-solid ${t.icon}"></i>
+                                </div>
+                                <span class="font-semibold text-sm dark:text-white">${t.name}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    ${App.state.user ? `
+                        <div class="bg-white dark:bg-ios-card p-4 rounded-xl">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="font-bold dark:text-white">${App.t('itinerary_my')}</h4>
+                                <button onclick="App.openCreateRouteModal()" class="text-ios-blue text-sm font-medium">${App.t('itinerary_create')}</button>
+                            </div>
+                            ${App.state.user.itineraries.length > 0 ? `
+                                <div class="space-y-2">
+                                    ${App.state.user.itineraries.map(r => `
+                                        <div class="route-list-item p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex justify-between items-center">
+                                            <div>
+                                                <span class="block font-medium text-sm dark:text-white">${r.name}</span>
+                                                <span class="text-xs text-gray-500">${r.date}</span>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button onclick="App.viewSavedRoute(${r.id})" class="w-10 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900 text-ios-blue rounded-lg tap-active" aria-label="${App.t('view_btn')}">
+                                                    <i class="fa-solid fa-eye"></i>
+                                                </button>
+                                                <button onclick="App.deleteSavedRoute(${r.id}, this)" class="w-10 h-8 flex items-center justify-center bg-red-100 dark:bg-red-900 text-ios-red rounded-lg tap-active" aria-label="${App.t('delete_btn')}">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : `
+                                <div class="text-center text-gray-400 py-6 text-sm border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                                    ${App.t('itinerary_empty')}
+                                </div>
+                            `}
+                        </div>
+                    ` : `
+                        <div class="bg-blue-50 dark:bg-blue-900/50 p-4 rounded-xl text-center">
+                            <p class="text-blue-800 dark:text-blue-200 text-sm mb-2">${App.t('msg_login_req')}</p>
+                            <button onclick="App.navigate('profile')" class="bg-ios-blue text-white px-4 py-2 rounded-lg text-sm font-semibold">${App.t('nav_profile')}</button>
+                        </div>
+                    `}
+                `;
+            },
+
+            // VISTA RENOMBRADA (antes 'reservations')
+            hotels() {
+                return `
+                    <!-- Filtros de Ubicación -->
+                    <div class="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        <button onclick="App.filterHotels('Toda España')" class="hotel-filter-btn bg-ios-blue text-white px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap" data-filter="Toda España">${App.t('hotel_spain_all')}</button>
+                        <button onclick="App.filterHotels('Pinto')" class="hotel-filter-btn bg-white dark:bg-ios-card text-gray-600 dark:text-gray-300 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap" data-filter="Pinto">${App.t('hotel_pinto')}</button>
+                        <button onclick="App.filterHotels('Madrid')" class="hotel-filter-btn bg-white dark:bg-ios-card text-gray-600 dark:text-gray-300 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap" data-filter="Madrid">${App.t('hotel_madrid')}</button>
+                    </div>
+
+                    <div class="relative mb-6">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
+                        <input type="text" placeholder="${App.t('book_search_ph')}" class="w-full bg-white dark:bg-ios-card h-12 pl-10 pr-4 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all">
+                    </div>
+
+                    <div id="hotel-list-container" class="space-y-4">
+                        ${DB.hotels.map(h => this.hotelCard(h)).join('')}
+                    </div>
+                `;
+            },
+
+            // FUNCIÓN RENOMBRADA (antes 'bookingCard')
+            hotelCard(hotel) { // Acepta un objeto
+                return `
+                    <div class="hotel-list-item bg-white dark:bg-ios-card rounded-xl overflow-hidden shadow-sm flex h-32 tap-active" 
+                         onclick="UI.openPaymentModal('${hotel.name}', '${hotel.price}')" data-location="${hotel.location}">
+                        <img src="${hotel.img}" class="w-32 h-full object-cover" onerror="this.src='https://placehold.co/128x128/f0f0f0/ccc?text=Hotel'">
+                        <div class="p-3 flex-1 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-bold dark:text-white leading-tight">${hotel.name}</h4>
+                                <p class="text-xs text-gray-500 mt-1">${hotel.rating} - ${hotel.location}</p>
+                            </div>
+                            <div class="flex justify-between items-end">
+                                <span class="text-ios-blue font-bold text-lg">${hotel.price}</span>
+                                <button class="bg-gray-100 dark:bg-gray-700 text-xs px-3 py-1 rounded-lg font-medium dark:text-white">${App.t('pay_btn')}</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // --- INICIO NUEVAS VISTAS ---
+            spain() {
+                 return `
+                    <div class="space-y-6 overflow-y-auto h-full pb-10">
+                        <div class="bg-red-500 rounded-xl p-6 text-white shadow-lg text-center">
+                            <h2 class="text-3xl font-bold mb-2">${App.t('spain_title')}</h2>
+                            <p class="opacity-90">${App.t('spain_subtitle')}</p>
+                        </div>
+                         <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white dark:bg-ios-card p-4 rounded-xl text-center">
+                                <i class="fa-solid fa-cloud-sun text-2xl text-yellow-500 mb-2"></i>
+                                <h4 class="font-bold text-sm dark:text-white">${App.t('weather')}</h4>
+                                <p class="text-xs text-gray-500">Mediterráneo</p>
+                            </div>
+                            <div class="bg-white dark:bg-ios-card p-4 rounded-xl text-center">
+                                <i class="fa-solid fa-euro-sign text-2xl text-green-500 mb-2"></i>
+                                <h4 class="font-bold text-sm dark:text-white">${App.t('currency')}</h4>
+                                <p class="text-xs text-gray-500">Euro (€)</p>
+                            </div>
+                            <div class="bg-white dark:bg-ios-card p-4 rounded-xl text-center">
+                                <i class="fa-solid fa-hospital text-2xl text-red-500 mb-2"></i>
+                                <h4 class="font-bold text-sm dark:text-white">${App.t('emergency')}</h4>
+                                <p class="text-xs text-gray-500">112</p>
+                            </div>
+                             <div class="bg-white dark:bg-ios-card p-4 rounded-xl text-center">
+                                <i class="fa-solid fa-passport text-2xl text-blue-500 mb-2"></i>
+                                <h4 class="font-bold text-sm dark:text-white">${App.t('visa')}</h4>
+                                <p class="text-xs text-gray-500">Schengen</p>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Spain Map Section -->
+                        <div class="flex flex-col flex-1 h-full">
+                            <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('spain_map_title')}</h3>
+                            <div class="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                <button onclick="App.filterSpainMap('all')" class="spain-map-btn bg-ios-blue text-white px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap" data-filter="all">${App.t('map_all')}</button>
+                                <button onclick="App.filterSpainMap('tourist')" class="spain-map-btn bg-white dark:bg-ios-card text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap" data-filter="tourist">${App.t('spain_map_tourist')}</button>
+                                <button onclick="App.filterSpainMap('local')" class="spain-map-btn bg-white dark:bg-ios-card text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap" data-filter="local">${App.t('spain_map_local')}</button>
+                                <button onclick="App.filterSpainMap('hidden')" class="spain-map-btn bg-white dark:bg-ios-card text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap" data-filter="hidden">${App.t('spain_map_hidden')}</button>
+                            </div>
+                            <div class="mt-4 p-4 bg-white dark:bg-ios-card rounded-xl shadow-sm flex-1">
+                                <!-- MAPA REAL INTERACTIVO -->
+                                <div id="spain-map" class="h-64 w-full rounded-lg shadow-inner z-10">
+                                    <!-- Leaflet se inyectará aquí -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            cinema() {
+                return `
+                    <!-- Cines en Pinto -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('cinema_pinto_title')}</h3>
+                        <div class="space-y-3">
+                            ${DB.cinemas.map(c => `
+                                <div class="bg-white dark:bg-ios-card p-4 rounded-xl shadow-sm flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-bold dark:text-white">${c.name}</h4>
+                                        <p class="text-sm text-gray-500">${c.location} - ${c.price.toFixed(2)}€</p>
+                                    </div>
+                                    <button onclick="UI.openPaymentModal('${c.name}', '${c.price.toFixed(2)}€')" class="bg-ios-blue text-white px-3 py-2 rounded-lg text-sm font-semibold tap-active whitespace-nowrap">${App.t('buy_tickets')}</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Taquilla -->
+                    <div class="mt-6">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('cinema_box_office')}</h3>
+                        <div class="space-y-3">
+                            ${DB.movies.map(m => `
+                                <div class="flex items-center gap-4 bg-white dark:bg-ios-card p-3 rounded-xl">
+                                    <div class="w-10 h-14 bg-gray-200 dark:bg-gray-700 rounded flex-shrink-0"></div>
+                                    <div class="flex-1">
+                                        <h4 class="font-bold text-sm dark:text-white">${m.title}</h4>
+                                        <p class="text-xs text-gray-500">${m.dir}</p>
+                                    </div>
+                                    <span class="text-yellow-500 text-sm font-bold">★ ${m.rating}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+            
+            health() {
+                return `
+                    <!-- Tarjeta Sanitaria -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('health_card_info_title')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-4">
+                            <div>
+                                <h4 class="font-semibold dark:text-white">${App.t('health_card_info_eu')}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">${App.t('health_card_info_eu_desc')}</p>
+                            </div>
+                            <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 class="font-semibold dark:text-white">${App.t('health_card_info_other')}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">${App.t('health_card_info_other_desc')}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hospitales -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('health_hospitals')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                            ${DB.health.filter(h => h.type === 'hospital').map(h => this.healthItem(h)).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Centros de Salud -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('health_centers')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                            ${DB.health.filter(h => h.type === 'centro').map(h => this.healthItem(h)).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Farmacias Pinto -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('health_pharmacies_pinto')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                            ${DB.pharmacies.filter(p => p.type === 'pinto').map(p => this.pharmacyItem(p)).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Farmacias España -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('health_pharmacies_spain')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                            ${DB.pharmacies.filter(p => p.type === 'spain').map(p => this.pharmacyItem(p)).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+
+            // Helper functions for health view
+            healthItem(h) {
+                return `
+                    <div class="flex items-start gap-3 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-b-0">
+                        <i class="fa-solid ${h.type === 'hospital' ? 'fa-hospital' : 'fa-house-medical'} text-red-500 w-5 text-center mt-1"></i>
+                        <div>
+                            <p class="font-semibold text-sm dark:text-white">${h.name}</p>
+                            <p class="text-xs text-gray-500">${h.location}</p>
+                            <p class="text-xs text-gray-500"><span class="font-semibold">${App.t('health_services')}</span> ${h.services}</p>
+                        </div>
+                    </div>
+                `;
+            },
+
+            pharmacyItem(p) {
+                return `
+                    <div class="flex items-start gap-3 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-b-0">
+                        <i class="fa-solid fa-pills text-green-500 w-5 text-center mt-1"></i>
+                        <div>
+                            <p class="font-semibold text-sm dark:text-white">${p.name}</p>
+                            <p class="text-xs text-gray-500">${p.location}</p>
+                            <p class="text-xs text-gray-500"><span class="font-semibold">${App.t('hours_title')}:</span> ${p.hours}</p>
+                        </div>
+                    </div>
+                `;
+            },
+
+            banks() {
+                return `
+                    <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('bank_title')}</h3>
+                    <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                        ${DB.banks.map(b => `
+                            <div class="flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-b-0">
+                                <i class="fa-solid fa-landmark text-indigo-500 w-5 text-center"></i>
+                                <div>
+                                    <p class="font-semibold text-sm dark:text-white">${b.name}</p>
+                                    <p class="text-xs text-gray-500">${b.type}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+
+            gastronomy() {
+                return `
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('gastro_title_lujo')}</h3>
+                        <div class="space-y-3 mb-6">
+                            ${DB.restaurants.filter(r => r.type === 'lujo').map(r => this.restaurantCard(r)).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('gastro_title_local')}</h3>
+                        <div class="space-y-3">
+                            ${DB.restaurants.filter(r => r.type === 'local').map(r => this.restaurantCard(r)).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+            
+            // --- INICIO DE MODIFICACIÓN ---
+            getPriceText(priceSymbol) {
+                switch(priceSymbol) {
+                    case '€€€€': return App.t('price_expensive');
+                    case '€€€': return App.t('price_normal');
+                    case '€€': return App.t('price_cheap');
+                    default: return priceSymbol;
+                }
+            },
+            
+            restaurantCard(r) {
+                const priceText = this.getPriceText(r.price); // Usar la nueva función
+                return `
+                    <div class="bg-white dark:bg-ios-card p-4 rounded-xl shadow-sm flex items-center justify-between gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold dark:text-white truncate">${r.name}</h4>
+                            <p class="text-sm text-gray-500">${r.location} - <span class="font-medium">${priceText}</span></p>
+                        </div>
+                        <button onclick="App.showRestaurantDetails(${r.id})" class="bg-gray-100 dark:bg-gray-700 text-xs px-3 py-2 rounded-lg font-medium dark:text-white tap-active flex-shrink-0">${App.t('view_btn')}</button>
+                    </div>
+                `;
+            },
+            // --- FIN DE MODIFICACIÓN ---
+
+            sports() {
+                return `
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('sports_title')}</h3>
+                        <div class="space-y-4">
+                            ${DB.gyms.map(g => `
+                                <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h4 class="font-bold dark:text-white">${g.name}</h4>
+                                        <span class="text-blue-500 font-bold text-sm">${g.price}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500"><span class="font-semibold">${App.t('hours_title')}:</span> ${g.hours}</p>
+                                    <p class="text-xs text-gray-500"><span class="font-semibold"></span> ${g.location}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+            // --- FIN NUEVAS VISTAS ---
+
+            // --- VISTA RESTAURADA ---
+            mobility() {
+                 return `
+                    <!-- Tarifas Abono -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('mob_fares_title')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm space-y-3">
+                            ${this.mobilityInfoItem(App.t('mob_fare_young'), '20,00€ (Todas las zonas)', 'fa-child')}
+                            ${this.mobilityInfoItem(App.t('mob_fare_normal'), 'Desde 54,60€ (A) hasta 131,80€ (E2)', 'fa-user')}
+                            ${this.mobilityInfoItem(App.t('mob_fare_senior'), 'Gratuito (Tarjeta > 65)', 'fa-person-cane')}
+                        </div>
+                    </div>
+
+                    <!-- Zonas -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('mob_zones_title')}</h3>
+                        <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm">
+                            <p class="text-sm text-gray-600 dark:text-gray-300">${App.t('mob_zones_desc')}</p>
+                            <div class="flex justify-around mt-4">
+                                <span class="font-bold text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">A</span>
+                                <span class="font-bold text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">B1</span>
+                                <span class="font-bold text-xs bg-blue-500 text-white px-2 py-1 rounded">B2</span>
+                                <span class="font-bold text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">B3</span>
+                                <span class="font-bold text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">C1</span>
+                                <span class="font-bold text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">C2</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mapas -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('mob_map_title')}</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm text-center">
+                                <div class="h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center mb-2">
+                                    <span classs="text-xs text-gray-400">${App.t('mob_placeholder_desc')}</span>
+                                </div>
+                                <span class="font-semibold text-sm dark:text-white">${App.t('mob_map_renfe')}</span>
+                            </div>
+                            <div class="bg-white dark:bg-ios-card rounded-xl p-4 shadow-sm text-center">
+                                <div class="h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center mb-2">
+                                    <span class="text-xs text-gray-400">${App.t('mob_placeholder_desc')}</span>
+                                </div>
+                                <span class="font-semibold text-sm dark:text-white">${App.t('mob_map_metro')}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Horarios -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">${App.t('mob_schedule_title')}</h3>
+                        <div class="grid gap-4">
+                            <button onclick="UI.showModal(App.t('mob_schedule_train'), \`
+                                <h4 class='font-bold text-lg dark:text-white mb-2'>\${App.t('schedule_train_title')}</h4>
+                                <p class='text-sm text-gray-500 mb-4'>\${App.t('schedule_train_dir_1')}</p>
+                                <ul class='space-y-2'>
+                                  <li class='flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg'><span>06:15</span> <span>06:30</span> <span>06:45</span></li>
+                                  <li class='flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg'><span>07:00</span> <span>07:15</span> <span>07:30</span></li>
+                                  <li class='text-center text-xs text-gray-400 mt-2'>\${App.t('schedule_every_20')}</li>
+                                </ul>\`);" 
+                                class="w-full bg-white dark:bg-ios-card p-4 rounded-xl flex items-center justify-between tap-active shadow-sm">
+                                <span class="font-medium dark:text-white">${App.t('mob_schedule_train')}</span>
+                                <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                            </button>
+                            <button onclick="UI.showModal(App.t('mob_schedule_bus'), \`
+                                <h4 class='font-bold text-lg dark:text-white mb-2'>\${App.t('schedule_bus_title')}</h4>
+                                <p class='text-sm text-gray-500 mb-4'>\${App.t('schedule_bus_dir_1')}</p>
+                                <ul class='space-y-2'>
+                                  <li class='flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg'><span>07:00</span> <span>07:20</span> <span>07:40</span></li>
+                                  <li class='flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg'><span>08:00</span> <span>08:20</span> <span>08:40</span></li>
+                                  <li class='text-center text-xs text-gray-400 mt-2'>\${App.t('schedule_every_20')}</li>
+                                </ul>\`);" 
+                                class="w-full bg-white dark:bg-ios-card p-4 rounded-xl flex items-center justify-between tap-active shadow-sm">
+                                <span class="font-medium dark:text-white">${App.t('mob_schedule_bus')}</span>
+                                <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            // Helper para la vista de movilidad
+            mobilityInfoItem(title, text, icon) {
+                return `
+                    <div class="flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 pb-3 last:border-b-0">
+                        <i class="fa-solid ${icon} text-blue-500 w-5 text-center"></i>
+                        <div>
+                            <p class="font-semibold text-sm dark:text-white">${title}</p>
+                            <p class="text-xs text-gray-500">${text}</p>
+                        </div>
+                    </div>
+                `;
+            },
+            // --- FIN VISTA RESTAURADA ---
+
+            profile() {
+                if (!App.state.user) {
+                    return `
+                        <div class="flex flex-col items-center justify-center h-[60vh] text-center">
+                            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-6">
+                                <i class="fa-solid fa-user text-4xl text-gray-400"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold mb-2 dark:text-white">${App.t('auth_welcome')}</h2>
+                            <p class="text-gray-500 mb-8 px-8">${App.t('auth_subtitle')}</p>
+                            
+                            <form onsubmit="event.preventDefault(); App.login(this.username.value)" class="w-full max-w-xs space-y-4">
+                                <input type="text" name="username" placeholder="${App.t('auth_placeholder')}" required class="w-full h-12 px-4 rounded-xl bg-white dark:bg-ios-card border border-gray-200 dark:border-gray-700 focus:outline-none focus:border-ios-blue dark:text-white">
+                                <input type="password" name="password" placeholder="${App.t('auth_password')}" required class="w-full h-12 px-4 rounded-xl bg-white dark:bg-ios-card border border-gray-200 dark:border-gray-700 focus:outline-none focus:border-ios-blue dark:text-white">
+                                <button type="submit" class="w-full h-12 bg-ios-blue text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 tap-active">
+                                    ${App.t('auth_login')}
+                                </button>
+                            </form>
+                            ${this.settingsList()}
+                        </div>
+                    `;
+                }
+
+                return `
+                     <div class="flex items-center gap-4 mb-8 pt-4">
+                        <div class="w-20 h-20 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                            ${App.state.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold dark:text-white">${App.state.user.name}</h2>
+                            <p class="text-gray-500 text-sm">${App.t('auth_expert')}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-ios-card rounded-xl overflow-hidden mb-6">
+                         <div onclick="App.navigate('favs_list')" class="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700 tap-active cursor-pointer">
+                            <span class="flex items-center gap-3 dark:text-white"><i class="fa-solid fa-heart text-red-500 w-6"></i> ${App.t('prof_favs')}</span>
+                            <span class="text-gray-400 text-sm">${App.state.user.favorites.length} <i class="fa-solid fa-chevron-right ml-2"></i></span>
+                        </div>
+                         <div onclick="App.navigate('routes_list')" class="flex justify-between items-center p-4 tap-active cursor-pointer">
+                            <span class="flex items-center gap-3 dark:text-white"><i class="fa-solid fa-map text-green-500 w-6"></i> ${App.t('prof_routes')}</span>
+                            <i class="fa-solid fa-chevron-right text-gray-400 text-sm"></i>
+                        </div>
+                    </div>
+
+                    ${this.settingsList()}
+
+                    <button onclick="App.logout()" class="w-full py-4 text-red-500 font-medium bg-white dark:bg-ios-card rounded-xl mt-4 tap-active">
+                        ${App.t('auth_logout')}
+                    </button>
+                `;
+            },
+
+            favoritesList() {
+                if (!App.state.user || App.state.user.favorites.length === 0) {
+                    return `<div class="p-8 text-center text-gray-400">${App.t('favs_empty')}</div>`;
+                }
+                // Filter DB places by favorite IDs
+                const favPlaces = DB.places.filter(p => App.state.user.favorites.includes(p.id));
+                
+                return `
+                    <div class="space-y-4">
+                        ${favPlaces.map(p => `
+                            <div class="bg-white dark:bg-ios-card rounded-xl overflow-hidden flex h-24">
+                                <img src="${p.img}" class="w-24 h-full object-cover" onerror="this.src='https::/placehold.co/96x96/f0f0f0/ccc?text=Pinto'">
+                                <div class="p-3 flex-1 flex flex-col justify-center">
+                                    <h4 class="font-bold dark:text-white">${p.name}</h4>
+                                    <p class="text-xs text-gray-500 line-clamp-1">${p.desc}</p>
+                                </div>
+                                <button onclick="App.toggleFavorite(${p.id}, this); this.closest('div').remove()" class="px-4 text-red-500">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+
+            routesList() {
+                if (!App.state.user || App.state.user.itineraries.length === 0) {
+                    return `<div class="p-8 text-center text-gray-400">${App.t('routes_user_empty')}</div>`;
+                }
+                
+                return `
+                    <div class="space-y-3">
+                         ${App.state.user.itineraries.map(r => `
+                            <div class="route-list-item p-4 bg-white dark:bg-ios-card rounded-xl flex justify-between items-center shadow-sm">
+                                <div>
+                                    <span class="block font-bold dark:text-white">${r.name}</span>
+                                    <span class="text-xs text-gray-500">${r.date}</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="App.viewSavedRoute(${r.id})" class="w-10 h-10 flex items-center justify-center bg-blue-100 dark:bg-blue-900 text-ios-blue rounded-lg tap-active" aria-label="${App.t('view_btn')}">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                    <button onclick="App.deleteSavedRoute(${r.id}, this)" class="w-10 h-10 flex items-center justify-center bg-red-100 dark:bg-red-900 text-ios-red rounded-lg tap-active" aria-label="${App.t('delete_btn')}">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+
+            settingsList() {
+                return `
+                    <div class="bg-white dark:bg-ios-card rounded-xl overflow-hidden mt-6">
+                        <!-- Language -->
+                        <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                            <span class="flex items-center gap-3 dark:text-white"><i class="fa-solid fa-globe text-blue-500 w-6"></i> ${App.t('prof_lang')}</span>
+                            <select onchange="App.updateLanguage(this.value)" class="bg-transparent text-right text-ios-blue outline-none">
+                                ${Object.entries(DB.languages).map(([k, v]) => `<option value="${k}" ${App.state.lang === k ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- Dark Mode -->
+                        <div class="p-4 flex justify-between items-center">
+                            <span class="flex items-center gap-3 dark:text-white"><i class="fa-solid fa-moon text-purple-500 w-6"></i> ${App.t('prof_dark')}</span>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" name="toggle" id="toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" ${App.state.theme === 'dark' ? 'checked' : ''} onclick="App.toggleTheme()"/>
+                                <label for="toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            cardBig(title, icon, color, action) {
+                return `
+                    <div onclick="${action}" class="bg-white dark:bg-ios-card p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 h-32 tap-active cursor-pointer">
+                        <div class="${color} w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shadow-md mb-1">
+                            <i class="fa-solid ${icon}"></i>
+                        </div>
+                        <span class="font-semibold text-sm dark:text-white text-center leading-tight">${title}</span>
+                    </div>
+                `;
+            }
+        };
+
+        /**
+         * UI UTILS
+         */
+        const UI = {
+            showModal(title, contentHTML) {
+                const overlay = document.getElementById('modal-overlay');
+                const content = document.getElementById('modal-content');
+                
+                content.innerHTML = `
+                    <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+                    <h3 id="modal-title-text" class="text-xl font-bold mb-4 text-center dark:text-white">${title}</h3>
+                    <div id="modal-body-content" class="text-gray-600 dark:text-gray-300">${contentHTML}</div>
+                    <button onclick="UI.closeModal()" class="mt-6 w-full bg-gray-100 dark:bg-gray-700 py-3 rounded-xl font-semibold text-sm dark:text-white">Cerrar</button>
+                `;
+
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    overlay.classList.remove('opacity-0');
+                    content.classList.remove('translate-y-full');
+                    content.classList.add('sm:translate-y-0');
+                }, 10);
+            },
+
+            updateModalContent(title, contentHTML) {
+                const titleEl = document.getElementById('modal-title-text');
+                const bodyEl = document.getElementById('modal-body-content');
+                if(titleEl) titleEl.innerText = title;
+                if(bodyEl) {
+                    bodyEl.innerHTML = contentHTML;
+                    // Eliminar el botón "Cerrar" por defecto si hay botones nuevos
+                    const defaultCloseBtn = bodyEl.nextElementSibling;
+                    if (defaultCloseBtn && defaultCloseBtn.tagName === 'BUTTON' && (defaultCloseBtn.innerText.toLowerCase() === 'cerrar' || defaultCloseBtn.innerText.toLowerCase() === 'close')) {
+                        defaultCloseBtn.style.display = 'none';
+                    }
+                }
+            },
+
+            openPaymentModal(item, price) {
+                const html = `
+                    <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl mb-4 flex justify-between items-center">
+                        <span class="font-medium dark:text-white">${item}</span>
+                        <span class="font-bold text-ios-blue">${price}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-4 uppercase font-bold tracking-wide">${App.t('pay_method')}</p>
+                    
+                    <div class="space-y-3">
+                        <button onclick="App.processPayment('card')" class="w-full flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-xl tap-active">
+                            <i class="fa-regular fa-credit-card text-xl text-blue-500"></i> <span class="font-medium dark:text-white">${App.t('pay_card')}</span>
+                        </button>
+                        <button onclick="App.processPayment('bizum')" class="w-full flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-xl tap-active">
+                            <i class="fa-solid fa-mobile-screen text-xl text-orange-500"></i> <span class="font-medium dark:text-white">${App.t('pay_bizum')}</span>
+                        </button>
+                         <button onclick="App.processPayment('cash')" class="w-full flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-xl tap-active">
+                            <i class="fa-solid fa-money-bill text-xl text-green-500"></i> <span class="font-medium dark:text-white">${App.t('pay_cash')}</span>
+                        </button>
+                    </div>
+                `;
+                this.showModal(App.t('pay_modal_title'), html);
+            },
+
+            closeModal() {
+                const overlay = document.getElementById('modal-overlay');
+                const content = document.getElementById('modal-content');
+                
+                overlay.classList.add('opacity-0');
+                content.classList.add('translate-y-full');
+                
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            },
+
+            showToast(msg, type = 'success') {
+                const toast = document.getElementById('toast');
+                const icon = document.getElementById('toast-icon');
+                const text = document.getElementById('toast-message');
+
+                text.innerText = msg;
+                
+                if(type === 'error') {
+                    icon.className = 'fa-solid fa-circle-exclamation text-red-500 text-xl';
+                } else if(type === 'info') {
+                    icon.className = 'fa-solid fa-info-circle text-blue-500 text-xl';
+                } else {
+                    icon.className = 'fa-solid fa-circle-check text-green-500 text-xl';
+                }
+
+                toast.classList.remove('-translate-y-24', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('-translate-y-24', 'opacity-0');
+                }, 3000);
+            },
+
+            showLoading(isLoading, text = "Cargando...") {
+                const container = document.getElementById('app-container');
+                if(isLoading) {
+                    const loader = document.createElement('div');
+                    loader.id = 'global-loader';
+                    loader.className = 'absolute inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-40';
+                    loader.innerHTML = `
+                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-ios-blue mb-3"></div>
+                        <span class="text-sm font-medium text-gray-500 animate-pulse">${text}</span>
+                    `;
+                    container.appendChild(loader);
+                } else {
+                    const loader = document.getElementById('global-loader');
+                    if(loader) loader.remove();
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+
+    </script>
+</body>
+</html>
